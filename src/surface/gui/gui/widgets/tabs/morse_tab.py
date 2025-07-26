@@ -3,8 +3,7 @@ from threading import Thread
 from time import sleep
 
 from ament_index_python.packages import get_package_share_directory
-from PyQt6.QtCore import Qt
-from PyQt6.QtCore import pyqtSignal, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont, QPixmap
 from PyQt6.QtWidgets import (
     QGridLayout,
@@ -56,6 +55,7 @@ MORSE_DICT = {
     'Z': '--..',
 }
 
+
 class MorseTab(QWidget):
     set_light_signal = pyqtSignal(bool)
 
@@ -92,9 +92,7 @@ class MorseTab(QWidget):
 
         self.set_light_signal.connect(self.set_light)
 
-        map_path = str(
-            Path(get_package_share_directory('gui')) / 'images' / 'morse_code.png'
-        )
+        map_path = str(Path(get_package_share_directory('gui')) / 'images' / 'morse_code.png')
         map_pixmap = QPixmap(map_path)
         map_label = QLabel()
         map_label.setPixmap(
