@@ -77,7 +77,7 @@ If you're connecting the Pi to your laptop through a router, the router should b
 The CWRUbotix extension runs our custom code in the pi packages (including this one). To install it, navigate to the Extensions tab, click "Installed" on the top, and press the plus button on the lower right. Fill out the options in the create extension form like so:
 - Extension Identifier: Used for internal identification only. I recommend `cwrubotix.ros2` or similar.
 - Extension Name: Human-readable name for the extension. Currently "CWRUbotix ROS" but feel free to change.
-- Docker Image: URI for the docker image. Currently `noahmollerstuen/blueos-cwrubotix-ros2-extension` (hopefully will be moved to a team docker account)
+- Docker Image: URI for the docker image. Currently `cwrubotixmaterov/blueos-cwrubotix-ros2-extension`
 - Docker Tag: Docker images can have multiple versions (like branches). By default, use `main`.
 - Original settings: The permissions and other metadata for the extension. This is important for the extension to be able to access the network and hardware devices. Paste in this json object:
 ```json
@@ -96,8 +96,10 @@ The CWRUbotix extension runs our custom code in the pi packages (including this 
 Clicking "Create" should download the docker image (this can take a few minutes). The extension will then start up automatically and should run automatically when the pi reboots. When the extension is running, "ROS2" tab should appear in the left sidebar, and clicking it should open a terminal in which ros is running. The extension runs `ros2 launch pi_main pi_launch.py` on startup.
 
 ## Usage
-The BlueOS web dashboard contains just about all the tools you need to monitor and control the Pi. The "Vehicle Setup" tab can be used to test the thrusters, assign output pins to motor numbers, and reverse thrusters as needed.
+The BlueOS web dashboard contains just about all the tools you need to monitor and control the Pi. The "Vehicle Setup" tab can be used to test the thrusters, assign output pins to motor numbers, and reverse thrusters as needed. To assign the correct mapping between thrusters and pin numbers, I recommend setting all eight back to the default (pin 1 = motor 1, ...), then spin each motor in order, write down the order the thrusters actually spin, and enter that order in all at once.
 
+### Updating the extension
+When you push any changes in the pi folder, there are certain manual steps you need to take to get that updated code on the navigator. There is a separate repository (https://github.com/CWRUbotix/rov-blueos-extension) that is responsible for packaging our code into an extension. See the readme at the link above for instructions.
 
 ## Nodes
 
