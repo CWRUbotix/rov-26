@@ -1,4 +1,4 @@
-# MATE ROV 2024-25
+# MATE ROV 2025-26
 
 [![Continuous Integration](https://github.com/CWRUbotix/rov-25/actions/workflows/industrial_ci_action.yml/badge.svg)](https://github.com/CWRUbotix/rov-25/actions/workflows/industrial_ci_action.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CWRUbotix/rov-25/main.svg)](https://results.pre-commit.ci/latest/github/CWRUbotix/rov-25/main)

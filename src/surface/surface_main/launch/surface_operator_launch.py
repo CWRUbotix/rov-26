@@ -10,8 +10,8 @@ from launch_ros.actions import PushRosNamespace
 def generate_launch_description() -> LaunchDescription:
     gui_path = get_package_share_directory('gui')
     flight_control_path = get_package_share_directory('flight_control')
-    vehicle_manager_path = get_package_share_directory('vehicle_manager')
     transceiver_path = get_package_share_directory('transceiver')
+    photosphere_path = get_package_share_directory('photosphere')
 
     # Launches Gui
     gui_launch = IncludeLaunchDescription(
@@ -25,17 +25,17 @@ def generate_launch_description() -> LaunchDescription:
         ),
     )
 
-    # Launches Vehicle Manager
-    vehicle_manager_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            [str(Path(vehicle_manager_path) / 'launch' / 'vehicle_manager_launch.py')]
-        ),
-    )
-
     # Launches Transceiver
     transceiver_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [str(Path(transceiver_path) / 'launch' / 'serial_reader_launch.py')]
+        ),
+    )
+
+    # Launches Photosphere
+    photosphere_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [str(Path(photosphere_path) / 'launch' / 'photosphere_launch.py')]
         ),
     )
 
@@ -44,8 +44,8 @@ def generate_launch_description() -> LaunchDescription:
             PushRosNamespace('surface'),
             gui_launch,
             flight_control_launch,
-            vehicle_manager_launch,
             transceiver_launch,
+            photosphere_launch,
         ]
     )
 
