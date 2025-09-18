@@ -30,7 +30,7 @@ If you have GitHub Desktop, click the green `Code` button above, then `Open with
 If you have the Git CLI, start by opening up a terminal, navigating to where you want the code to be saved, and entering the following command:
 
 ```bash
-git clone --recurse-submodules git@github.com:CWRUbotix/rov-25.git
+git clone --recurse-submodules git@github.com:CWRUbotix/rov-26.git
 ```
 
 > For already cloned repos, make sure you download submodules:
