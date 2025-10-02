@@ -37,3 +37,6 @@ max-args = 10
 "test*" = ["S101", "INP001", "PLR2004"]
 "setup.py" = ["INP001"]
 "*/launch/*" = ["INP001"]
+
+[tool.ruff.format]
+exclude = [src/surface/photosphere/photosphere/projection_matrix/.*]
