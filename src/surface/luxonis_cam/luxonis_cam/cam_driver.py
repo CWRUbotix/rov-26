@@ -1,14 +1,17 @@
 from dataclasses import dataclass
 from enum import StrEnum
+import sys
 
 import cv2
 import depthai
+import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
 from numpy import generic
 from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
+
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
@@ -135,7 +138,7 @@ class FramePublishers:
         """
         return self.node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
 
-    def try_get_publish(self, topic: StreamTopic, queue: depthai.DataOutputQueue) -> None:
+    def try_get_publish(self, topic: StreamTopic, queue: depthai.MessageQueue) -> None:
         """
         Attempt to get a frame from the queue and publish it on the topic.
 
@@ -235,7 +238,7 @@ class LuxonisCamDriverNode(Node):
 
         self.deploy_pipeline()
 
-        calib_data = self.device.readCalibration()
+        calib_data = self.pipeline.getCalibrationData()
         focal_lengths_mm = [0.0, 0.0]
         self.intrinsics: list[list[list[float]]] = []
         try:
@@ -286,25 +289,28 @@ class LuxonisCamDriverNode(Node):
 
     def deploy_pipeline(self) -> None:
         """Create a depthai pipeline and deploy it to the camera."""
-        pipeline = depthai.Pipeline()
+        self.pipeline = depthai.Pipeline()
 
-        left_cam_node = pipeline.createColorCamera()
-        left_cam_node.setBoardSocket(LEFT_CAM_SOCKET)
-        left_cam_node.setResolution(depthai.ColorCameraProperties.SensorResolution.THE_800_P)
+        left_cam_node = self.pipeline.create(depthai.node.Camera).build(boardSocket=LEFT_CAM_SOCKET, 
+                                                                   sensorResolution=(1280, 800))
 
-        right_cam_node = pipeline.createColorCamera()
-        right_cam_node.setBoardSocket(RIGHT_CAM_SOCKET)
-        right_cam_node.setResolution(depthai.ColorCameraProperties.SensorResolution.THE_800_P)
+
+        right_cam_node = self.pipeline.create(depthai.node.Camera).build(boardSocket=RIGHT_CAM_SOCKET, 
+                                                                    sensorResolution=(1280, 800))
         right_cam_node.initialControl.setMisc('3a-follow', depthai.CameraBoardSocket.CAM_D.value)
 
-        script = pipeline.createScript()
+        script = self.pipeline.create(depthai.node.Script)
         script_str = f"""
 enabled_flags = [False] * {len(self.script_topics)}
 toggle_inputs = ["{'", "'.join([names.script_toggle_name for names in self.script_topics])}"]
+print("1here")
+sys.stdout.write("Hello")
+print(toggle_inputs)
 frame_inputs = ["{'", "'.join([names.script_input_name for names in self.script_topics])}"]
 frame_outputs = ["{'", "'.join([names.script_output_name for names in self.script_topics])}"]
 
 while True:
+    print("IN HERE HERE")
     for i, (toggle_input, frame_input, frame_output) in enumerate(zip(toggle_inputs, frame_inputs,
                                                                       frame_outputs)):
         toggle_msg = node.io[toggle_input].tryGet()
@@ -312,6 +318,7 @@ while True:
             enabled_flags[i] = toggle_msg.getData()[0]
 
         frame = node.io[frame_input].tryGet()
+        
 
         if frame is not None and enabled_flags[i]:
             node.io[frame_output].send(frame)
@@ -319,29 +326,33 @@ while True:
         # self.get_logger().info('\nScript:\n"""' + script_str + '"""\n')
         script.setScript(script_str)
 
-        for node, meta in zip(
+        cam_outputs = {}
+
+        for node, meta, cam_id in zip(
             (left_cam_node, right_cam_node),
             [self.stream_metas[cam_id] for cam_id in (CAM_IDS.LUX_LEFT, CAM_IDS.LUX_RIGHT)],
+            (CAM_IDS.LUX_LEFT, CAM_IDS.LUX_RIGHT),
             strict=True,
         ):
             # Camera frame reader -> script [script_input_name]
-            node.setPreviewSize(FRAME_WIDTH, FRAME_HEIGHT)
-            node.setInterleaved(False)
-            node.setColorOrder(depthai.ColorCameraProperties.ColorOrder.RGB)
-            node.preview.link(script.inputs[meta.script_topics.script_input_name])
+            camera_output = node.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), 
+                                               type=depthai.ImgFrame.Type.RGB888p)
+            camera_output.link(script.inputs[meta.script_topics.script_input_name])
+            cam_outputs[cam_id] = camera_output
 
-        stereo_node = pipeline.create(depthai.node.StereoDepth)
-        stereo_node.setDefaultProfilePreset(depthai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+        stereo_node = self.pipeline.create(depthai.node.StereoDepth)
+        stereo_node.setDefaultProfilePreset(depthai.node.StereoDepth.PresetMode.HIGH_DETAIL)
 
-        for names in self.script_topics:
-            # Camera toggler -> script [script_toggle_name]
-            toggle_xin = pipeline.create(depthai.node.XLinkIn)
-            toggle_xin.setStreamName(names.toggle_in_stream_name)
-            toggle_xin.setMaxDataSize(1)
-            toggle_xin.out.link(script.inputs[names.script_toggle_name])
+        # for names in self.script_topics:
+        #     # Camera toggler -> script [script_toggle_name]
+        #     toggle_xin = pipeline.create(depthai.node.XLinkIn)
+        #     toggle_xin.setStreamName(names.toggle_in_stream_name)
+        #     toggle_xin.setMaxDataSize(1)
+        #     toggle_xin.out.link(script.inputs[names.script_toggle_name])
 
-        left_cam_node.isp.link(script.inputs[self.left_stereo_script_topics.script_input_name])
-        right_cam_node.isp.link(script.inputs[self.right_stereo_script_topics.script_input_name])
+
+        left_cam_node.requestFullResolutionOutput().link(script.inputs[self.left_stereo_script_topics.script_input_name])
+        right_cam_node.requestFullResolutionOutput().link(script.inputs[self.right_stereo_script_topics.script_input_name])
         script.outputs[self.left_stereo_script_topics.script_output_name].link(stereo_node.left)
         script.outputs[self.right_stereo_script_topics.script_output_name].link(stereo_node.right)
 
@@ -358,20 +369,26 @@ while True:
             script.inputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_input_name]
         )
 
-        for stream_meta in self.stream_metas.values():
-            # script [script_output_name] -> cam_xout
-            frame_xout = pipeline.create(depthai.node.XLinkOut)
-            frame_xout.setStreamName(stream_meta.out_stream_name)
-            frame_xout.input.setBlocking(False)
-            frame_xout.input.setQueueSize(1)
-            script.outputs[stream_meta.script_topics.script_output_name].link(frame_xout.input)
+        # for stream_meta in self.stream_metas.values():
+        #     # script [script_output_name] -> cam_xout
+        #     frame_xout = pipeline.create(depthai.node.XLinkOut)
+        #     frame_xout.setStreamName(stream_meta.out_stream_name)
+        #     frame_xout.input.setBlocking(False)
+        #     frame_xout.input.setQueueSize(1)
+        #     script.outputs[stream_meta.script_topics.script_output_name].link(frame_xout.input)
 
         self.get_logger().info('Deploying pipeline...')
+        print(self.stream_metas.items())
+        print(cam_outputs)
+        self.frame_output_queues = {
+            cam_id: cam_outputs[cam_id].createOutputQueue(maxSize=1) for cam_id in cam_outputs
+        }
 
         # Deploy pipeline to device
         while True:
             try:
-                self.device = depthai.Device(pipeline).__enter__()
+                self.pipeline.start()
+                self.pipeline.__enter__()
             except RuntimeError as e:  # noqa: F841 (unused variable e for optional logging below)
                 self.get_logger().warning(
                     'Error uploading to Luxonis cam, retrying '
@@ -383,16 +400,12 @@ while True:
                 continue
             break
 
-        self.left_stereo_toggle_queue = self.device.getInputQueue('left_stereo_toggle_in')
-        self.right_stereo_toggle_queue = self.device.getInputQueue('right_stereo_toggle_in')
-        self.toggle_queues = {
-            cam_id: self.device.getInputQueue(meta.script_topics.toggle_in_stream_name)
-            for cam_id, meta in self.stream_metas.items()
-        }
-        self.frame_output_queues = {
-            cam_id: self.device.getOutputQueue(meta.out_stream_name)
-            for cam_id, meta in self.stream_metas.items()
-        }
+        # self.left_stereo_toggle_queue = self.device.getInputQueue('left_stereo_toggle_in')
+        # self.right_stereo_toggle_queue = self.device.getInputQueue('right_stereo_toggle_in')
+        # self.toggle_queues = {
+        #     cam_id: self.device.getInputQueue(meta.script_topics.toggle_in_stream_name)
+        #     for cam_id, meta in self.stream_metas.items()
+        # }
 
         self.get_logger().info('Pipeline deployed')
 
@@ -428,14 +441,14 @@ while True:
                     break
 
             buf = depthai.Buffer()  # TODO: can we create this once and reuse?
-            buf.setData([1 if enable_stereo else 0])
-            self.left_stereo_toggle_queue.send(buf)
-            self.right_stereo_toggle_queue.send(buf)
+            buf.setData(np.array([1 if enable_stereo else 0]))
+            # self.left_stereo_toggle_queue.send(buf)
+            # self.right_stereo_toggle_queue.send(buf)
 
-            for cam_id, toggle_queue in self.toggle_queues.items():
-                buf = depthai.Buffer()
-                buf.setData([1 if self.stream_metas[cam_id].enabled else 0])
-                toggle_queue.send(buf)
+            # for cam_id, toggle_queue in self.toggle_queues.items():
+            #     buf = depthai.Buffer()
+            #     buf.setData(np.array([1 if self.stream_metas[cam_id].enabled else 0]))
+            #     toggle_queue.send(buf)
 
             self.missed_sends = 0
         except RuntimeError:
@@ -464,8 +477,8 @@ while True:
 
     def shutdown(self) -> None:
         """Free the device and any other resources."""
-        if self.device:
-            self.device.close()
+        if self.pipeline:
+            self.pipeline.__exit__(None, None, None)
 
 
 def main() -> None:

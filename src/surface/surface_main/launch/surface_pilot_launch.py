@@ -40,12 +40,13 @@ def generate_launch_description() -> LaunchDescription:
         condition=UnlessCondition(simulation_configuration),
     )
 
-    luxonis_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([str(Path(luxonis_path) / 'launch' / 'luxonis_launch.py')]),
-    )
+    #luxonis_launch = IncludeLaunchDescription(
+        #PythonLaunchDescriptionSource([str(Path(luxonis_path) / 'launch' / 'luxonis_launch.py')]),
+    #)
 
     namespace_launch = GroupAction(
-        actions=[PushRosNamespace('surface'), gui_launch, flir_watchdog, luxonis_launch]
+        # actions=[PushRosNamespace('surface'), gui_launch, flir_watchdog, luxonis_launch]
+        actions=[PushRosNamespace('surface'), gui_launch, flir_watchdog]
     )
 
     return LaunchDescription([namespace_launch])
