@@ -288,7 +288,16 @@ class LuxonisCamDriverNode(Node):
 
     def deploy_pipeline(self) -> None:
         """Create a depthai pipeline and deploy it to the camera."""
-        self.pipeline = depthai.Pipeline()
+        
+        
+        ###########################################################################################################################################################################################################################
+        # Think it might be redeploying when it already has the carmera so it can't find the device again
+        # investigate why it is missing dual cam spins and trying to redeploy
+        print("run deploy pipeline")
+        
+        device = depthai.Device()
+
+        self.pipeline = depthai.Pipeline(device)
 
         left_cam_node = self.pipeline.create(depthai.node.Camera).build(boardSocket=LEFT_CAM_SOCKET, 
                                                                    sensorResolution=(1280, 800))
