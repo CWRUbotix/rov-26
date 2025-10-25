@@ -1,6 +1,6 @@
+import sys
 from dataclasses import dataclass
 from enum import StrEnum
-import sys
 
 import cv2
 import depthai
@@ -11,7 +11,6 @@ from cv_bridge import CvBridge
 from numpy import generic
 from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
-
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
@@ -337,12 +336,12 @@ while True:
         stereo_node = self.pipeline.create(depthai.node.StereoDepth)
         stereo_node.setDefaultProfilePreset(depthai.node.StereoDepth.PresetMode.HIGH_DETAIL)
 
-        for names in self.script_topics:
-            # Camera toggler -> script [script_toggle_name]
-            toggle_xin = self.pipeline.create(depthai.node.XLinkIn)
-            toggle_xin.setStreamName(names.toggle_in_stream_name)
-            toggle_xin.setMaxDataSize(1)
-            toggle_xin.out.link(script.inputs[names.script_toggle_name])
+        # for names in self.script_topics:
+        #     # Camera toggler -> script [script_toggle_name]
+        #     toggle_xin = self.pipeline.create(depthai.node.XLinkIn)
+        #     toggle_xin.setStreamName(names.toggle_in_stream_name)
+        #     toggle_xin.setMaxDataSize(1)
+        #     toggle_xin.out.link(script.inputs[names.script_toggle_name])
 
 
         left_cam_node.requestFullResolutionOutput().link(script.inputs[self.left_stereo_script_topics.script_input_name])
@@ -363,13 +362,13 @@ while True:
             script.inputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_input_name]
         )
 
-        for stream_meta in self.stream_metas.values():
-            # script [script_output_name] -> cam_xout
-            frame_xout = self.pipeline.create(depthai.node.XLinkOut)
-            frame_xout.setStreamName(stream_meta.out_stream_name)
-            frame_xout.input.setBlocking(False)
-            frame_xout.input.setQueueSize(1)
-            script.outputs[stream_meta.script_topics.script_output_name].link(frame_xout.input)
+        # for stream_meta in self.stream_metas.values():
+        #     # script [script_output_name] -> cam_xout
+        #     frame_xout = self.pipeline.create(depthai.node.XLinkOut)
+        #     frame_xout.setStreamName(stream_meta.out_stream_name)
+        #     frame_xout.input.setBlocking(False)
+        #     frame_xout.input.setQueueSize(1)
+        #     script.outputs[stream_meta.script_topics.script_output_name].link(frame_xout.input)
 
         self.get_logger().info('Deploying pipeline...')
         print(self.stream_metas.items())
@@ -377,6 +376,20 @@ while True:
         self.frame_output_queues = {
             cam_id: cam_outputs[cam_id].createOutputQueue(maxSize=1) for cam_id in cam_outputs
         }
+
+        left_stereo_toggle_in = depthai.Node.Input(stereo_node, 'left_stereo_toggle_in')
+        right_stereo_toggle_in = depthai.Node.Input(stereo_node, 'right_stereo_toggle_in')
+        self.left_stereo_toggle_queue = stereo_node.Input.createInputQueue(left_stereo_toggle_in)
+        ##'left_stereo_toggle_in'
+        self.right_stereo_toggle_queue = stereo_node.Input.createInputQueue(right_stereo_toggle_in)
+        ##right_stereo_toggle_in
+        print(meta.script_topics.toggle_in_stream_name)
+        self.toggle_queues = {
+            cam_id: stereo_node.Input.createInputQueue(depthai.Node.Input(stereo_node, meta.script_topics.toggle_in_stream_name))
+            for cam_id, meta in self.stream_metas.items()
+        }
+
+        self.get_logger().info('Pipeline deployed')
 
         # Deploy pipeline to device
         while True:
@@ -394,14 +407,7 @@ while True:
                 continue
             break
         ##FIX THIS HERE I THINK THIS IS IT!!!!#########################################################################################################################################
-        self.left_stereo_toggle_queue = self.device.getInputQueue('left_stereo_toggle_in')
-        self.right_stereo_toggle_queue = self.device.getInputQueue('right_stereo_toggle_in')
-        self.toggle_queues = {
-            cam_id: self.device.getInputQueue(meta.script_topics.toggle_in_stream_name)
-            for cam_id, meta in self.stream_metas.items()
-        }
-
-        self.get_logger().info('Pipeline deployed')
+        
 
     def spin(self) -> None:
         """Run one iteration of I/O with the Luxonis cam."""
