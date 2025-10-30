@@ -412,7 +412,7 @@ while True:
                 )
                 # Uncomment to get more details about errors
                 # These are usually just "the cam is disconnected", but can be other things
-                # self.get_logger().warning(str(e))
+                self.get_logger().warning(str(e))
                 continue
             break
         ##FIX THIS HERE I THINK THIS IS IT!!!!#########################################################################################################################################
@@ -435,34 +435,34 @@ while True:
                     )
                 )
 
-        try:
-            # TODO: only send toggles when we actually need to change state?
-            for cam_id, output_queue in self.frame_output_queues.items():
-                if self.stream_metas[cam_id].enabled:
-                    self.frame_publishers.try_get_publish(
-                        self.stream_metas[cam_id].topic, output_queue
-                    )
+        # try:
+        # TODO: only send toggles when we actually need to change state?
+        for cam_id, output_queue in self.frame_output_queues.items():
+            if self.stream_metas[cam_id].enabled:
+                self.frame_publishers.try_get_publish(
+                    self.stream_metas[cam_id].topic, output_queue
+                )
 
-            enable_stereo = False
-            for cam_id in STREAMS_THAT_NEED_STEREO:
-                if self.stream_metas[cam_id].enabled:
-                    enable_stereo = True
-                    break
+        enable_stereo = False
+        for cam_id in STREAMS_THAT_NEED_STEREO:
+            if self.stream_metas[cam_id].enabled:
+                enable_stereo = True
+                break
 
-            buf = depthai.Buffer()  # TODO: can we create this once and reuse?
-            buf.setData(np.array([1 if enable_stereo else 0]))
-            # self.left_stereo_toggle_queue.send(buf)
-            # self.right_stereo_toggle_queue.send(buf)
+        buf = depthai.Buffer()  # TODO: can we create this once and reuse?
+        buf.setData([1 if enable_stereo else 0])
+        # self.left_stereo_toggle_queue.send(buf)
+        # self.right_stereo_toggle_queue.send(buf)
 
-            # for cam_id, toggle_queue in self.toggle_queues.items():
-            #     buf = depthai.Buffer()
-            #     buf.setData(np.array([1 if self.stream_metas[cam_id].enabled else 0]))
-            #     toggle_queue.send(buf)
+        # for cam_id, toggle_queue in self.toggle_queues.items():
+        #     buf = depthai.Buffer()
+        #     buf.setData(np.array([1 if self.stream_metas[cam_id].enabled else 0]))
+        #     toggle_queue.send(buf)
 
-            self.missed_sends = 0
-        except RuntimeError:
-            self.missed_sends += 1
-            self.get_logger().warn('Missed a dual cam spin')
+        self.missed_sends = 0
+        # except RuntimeError:
+        #     self.missed_sends += 1
+        #     self.get_logger().warn('Missed a dual cam spin')
 
         if self.missed_sends >= MISSED_SENDS_RESET_THRESHOLD:
             self.get_logger().error(
