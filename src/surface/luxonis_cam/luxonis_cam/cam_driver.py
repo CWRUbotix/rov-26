@@ -19,6 +19,8 @@ from rov_msgs.srv import CameraManage
 
 Matlike = NDArray[generic]
 
+# If you’re not explicitly setting board sockets here,
+# you may rely on defaults or your board’s wiring/config.
 LEFT_CAM_SOCKET = dai.CameraBoardSocket.CAM_A
 RIGHT_CAM_SOCKET = dai.CameraBoardSocket.CAM_D
 
@@ -78,11 +80,9 @@ class FramePublishers:
         return self.node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
 
     def try_get_publish(self, topic: StreamTopic, queue: dai.MessageQueue) -> None:
-        # queue is a MessageQueue (v3) from createOutputQueue()
         msg = queue.tryGet()
         if msg is None:
             return
-        # Narrow type
         if not isinstance(msg, dai.ImgFrame):
             self.node.get_logger().warn('Dequeued something other than an image frame, skipping')
             return
@@ -112,12 +112,12 @@ class LuxonisCamDriverNode(Node):
         super().__init__('luxonis_cam_driver', parameter_overrides=[])
 
         self.stream_metas = {
-            CAM_IDS.LUX_LEFT: StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
-            CAM_IDS.LUX_RIGHT: StreamMeta.of('right', StreamTopic.LUX_RAW, enabled=False),
-            CAM_IDS.LUX_LEFT_RECT: StreamMeta.of('left_rect', StreamTopic.RECT_LEFT, enabled=False),
+            CAM_IDS.LUX_LEFT:   StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
+            CAM_IDS.LUX_RIGHT:  StreamMeta.of('right', StreamTopic.LUX_RAW, enabled=False),
+            CAM_IDS.LUX_LEFT_RECT:  StreamMeta.of('left_rect', StreamTopic.RECT_LEFT, enabled=False),
             CAM_IDS.LUX_RIGHT_RECT: StreamMeta.of('right_rect', StreamTopic.RECT_RIGHT, enabled=False),
-            CAM_IDS.LUX_DISPARITY: StreamMeta.of('disparity', StreamTopic.DISPARITY, enabled=False),
-            CAM_IDS.LUX_DEPTH: StreamMeta.of('depth', StreamTopic.DEPTH, enabled=False),
+            CAM_IDS.LUX_DISPARITY:  StreamMeta.of('disparity', StreamTopic.DISPARITY, enabled=False),
+            CAM_IDS.LUX_DEPTH:      StreamMeta.of('depth', StreamTopic.DEPTH, enabled=False),
         }
 
         self.left_stereo_script_topics = StreamScriptTopicSet.of('left_stereo')
@@ -132,12 +132,8 @@ class LuxonisCamDriverNode(Node):
             CameraManage, 'manage_luxonis', self.cam_manage_callback
         )
         self.intrinsics_publishers = (
-            self.create_publisher(
-                Intrinsics, 'luxonis_left_intrinsics', QoSPresetProfiles.DEFAULT.value
-            ),
-            self.create_publisher(
-                Intrinsics, 'luxonis_right_intrinsics', QoSPresetProfiles.DEFAULT.value
-            ),
+            self.create_publisher(Intrinsics, 'luxonis_left_intrinsics',   QoSPresetProfiles.DEFAULT.value),
+            self.create_publisher(Intrinsics, 'luxonis_right_intrinsics',  QoSPresetProfiles.DEFAULT.value),
         )
 
         self.deploy_pipeline()
@@ -156,7 +152,6 @@ class LuxonisCamDriverNode(Node):
 
         self.frame_publishers = FramePublishers(self)
         self.get_logger().info('Pipeline created')
-
         self.missed_sends = 0
 
     def cam_manage_callback(
@@ -175,17 +170,18 @@ class LuxonisCamDriverNode(Node):
     def deploy_pipeline(self) -> None:
         pipeline = dai.Pipeline()
 
-        # Create left RGB camera
+        # Left camera
         left_cam = pipeline.create(dai.node.Camera)
-        left_cam.setBoardSocket(LEFT_CAM_SOCKET)
+        # No call to setBoardSocket
+        # Configure left camera
         left_cam.outputs['rgb'].setStreamName('left_rgb')
         left_cam.outputs['rgb'].setResolution((FRAME_WIDTH, FRAME_HEIGHT))
         left_cam.outputs['rgb'].setInterleaved(False)
         left_cam.outputs['rgb'].setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
 
-        # Create right RGB camera
+        # Right camera
         right_cam = pipeline.create(dai.node.Camera)
-        right_cam.setBoardSocket(RIGHT_CAM_SOCKET)
+        # No call to setBoardSocket
         right_cam.outputs['rgb'].setStreamName('right_rgb')
         right_cam.outputs['rgb'].setResolution((FRAME_WIDTH, FRAME_HEIGHT))
         right_cam.outputs['rgb'].setInterleaved(False)
@@ -211,11 +207,11 @@ while True:
 """
         script.setScript(script_str)
 
-        # Link camera outputs to script inputs (raw streams)
+        # Link raw streams
         left_cam.outputs['rgb'].link(script.inputs[self.stream_metas[CAM_IDS.LUX_LEFT].script_topics.script_input_name])
         right_cam.outputs['rgb'].link(script.inputs[self.stream_metas[CAM_IDS.LUX_RIGHT].script_topics.script_input_name])
 
-        # Stereo Depth node
+        # Stereo depth node
         stereo = pipeline.create(dai.node.StereoDepth)
         stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 
@@ -235,33 +231,29 @@ while True:
             script.inputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_input_name]
         )
 
-        # Host toggles (XLinkIn equivalent)
+        # Host toggles inputs
         for names in self.script_topics:
-            inp = script.inputs[names.script_toggle_name].createInputQueue(maxSize=1, blocking=False)
-            # Nothing else to link, host will send toggle buffers
+            script.inputs[names.script_toggle_name].createInputQueue(maxSize=1, blocking=False)
 
-        # Host outputs: script outputs to createOutputQueue
+        # Host outputs: create output queues
         self.frame_output_queues = {}
         for cam_id, meta in self.stream_metas.items():
-            out_q = script.outputs[meta.script_topics.script_output_name].createOutputQueue(maxSize=1, blocking=False)
-            self.frame_output_queues[cam_id] = out_q
+            q = script.outputs[meta.script_topics.script_output_name].createOutputQueue(maxSize=1, blocking=False)
+            self.frame_output_queues[cam_id] = q
 
-        # Start the pipeline
         pipeline.start()
-        self.device = pipeline  # assign so calibration/readCalibration still works
+        self.device = pipeline  # for calibration reading etc
 
-        # Host input queues for toggles
         self.left_stereo_toggle_queue = script.inputs[self.left_stereo_script_topics.script_toggle_name].createInputQueue(maxSize=1, blocking=False)
         self.right_stereo_toggle_queue = script.inputs[self.right_stereo_script_topics.script_toggle_name].createInputQueue(maxSize=1, blocking=False)
         self.toggle_queues = {
-            cam_id: meta.script_topics.script_toggle_name
+            cam_id: script.inputs[meta.script_topics.script_toggle_name]
             for cam_id, meta in self.stream_metas.items()
         }
 
         self.get_logger().info('Pipeline deployed')
 
     def spin(self) -> None:
-        # publish intrinsics
         if len(self.intrinsics) == len(self.intrinsics_publishers):
             for intr, pub in zip(self.intrinsics, self.intrinsics_publishers, strict=True):
                 pub.publish(
@@ -281,15 +273,13 @@ while True:
 
             enable_stereo = any(self.stream_metas[cam_id].enabled for cam_id in STREAMS_THAT_NEED_STEREO)
 
-            # send toggle for stereo
             buf = dai.Buffer()
             buf.setData([1 if enable_stereo else 0])
             self.left_stereo_toggle_queue.send(buf)
             self.right_stereo_toggle_queue.send(buf)
 
-            # send toggles for each stream
-            for cam_id, toggle_name in self.toggle_queues.items():
-                iq = script.inputs[toggle_name].createInputQueue(maxSize=1, blocking=False)
+            for cam_id, input_node in self.toggle_queues.items():
+                iq = input_node.createInputQueue(maxSize=1, blocking=False)
                 buf2 = dai.Buffer()
                 buf2.setData([1 if self.stream_metas[cam_id].enabled else 0])
                 iq.send(buf2)
@@ -307,7 +297,6 @@ while True:
             self.missed_sends = 0
 
     def shutdown(self) -> None:
-        # in v3 pipeline.stop() maybe used
         try:
             if hasattr(self.device, 'stop'):
                 self.device.stop()
