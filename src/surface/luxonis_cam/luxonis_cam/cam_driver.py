@@ -1,26 +1,28 @@
+from dataclasses import dataclass
+from enum import StrEnum
+
 import cv2
 import depthai as dai
 import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from rclpy.qos import QoSPresetProfiles
-from sensor_msgs.msg import Image
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
+from numpy import generic
+from numpy.typing import NDArray
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
+from rclpy.publisher import Publisher
+from rclpy.qos import QoSPresetProfiles
+from sensor_msgs.msg import Image
+
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
-from dataclasses import dataclass
-from enum import StrEnum
-from numpy.typing import NDArray
-from numpy import generic
-
 
 Matlike = NDArray[generic]
 
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 400
-MISSED_SENDS_RESET_THRESHOLD = 5
 
+MISSED_SENDS_RESET_THRESHOLD = 5
 
 class StreamTopic(StrEnum):
     LUX_RAW = 'lux_raw/image_raw'
@@ -29,162 +31,160 @@ class StreamTopic(StrEnum):
     DISPARITY = 'disparity/image_raw'
     DEPTH = 'depth/image_raw'
 
+@dataclass
+class StreamScriptTopicSet:
+    toggle_in_stream_name: str
+    script_toggle_name: str
+    script_input_name: str
+    script_output_name: str
+
+    @staticmethod
+    def of(stream_name: str) -> 'StreamScriptTopicSet':
+        return StreamScriptTopicSet(
+            toggle_in_stream_name=f'{stream_name}_toggle_in',
+            script_toggle_name=f'{stream_name}_toggle',
+            script_input_name=f'{stream_name}_script_in',
+            script_output_name=f'{stream_name}_script_out',
+        )
 
 @dataclass
 class StreamMeta:
     topic: StreamTopic
+    script_topics: StreamScriptTopicSet
+    out_stream_name: str
     enabled: bool
 
     @staticmethod
-    def of(topic: StreamTopic, enabled: bool) -> 'StreamMeta':
-        return StreamMeta(topic=topic, enabled=enabled)
-
+    def of(stream_name: str, topic: StreamTopic, *, enabled: bool) -> 'StreamMeta':
+        return StreamMeta(
+            topic=topic,
+            script_topics=StreamScriptTopicSet.of(stream_name),
+            out_stream_name=f'{stream_name}_out',
+            enabled=enabled,
+        )
 
 CAM_IDS = CameraManage.Request
 
-
-STREAMS_THAT_NEED_STEREO = [
-    CAM_IDS.LUX_LEFT_RECT,
-    CAM_IDS.LUX_RIGHT_RECT,
-    CAM_IDS.LUX_DISPARITY,
-    CAM_IDS.LUX_DEPTH,
-]
-
-
 class FramePublishers:
+    """Singleton to manage publishing video frames."""
     def __init__(self, node: Node) -> None:
         self.node = node
+        self.publishers = {topic: self.make_frame_publisher(topic) for topic in StreamTopic}
         self.bridge = CvBridge()
-        self.publishers = {
-            topic: node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
-            for topic in StreamTopic
-        }
 
-    def publish_frame(self, topic: StreamTopic, frame: dai.ImgFrame) -> None:
-        img = frame.getCvFrame()
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    def make_frame_publisher(self, topic: StreamTopic) -> Publisher:
+        return self.node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
+
+    def publish_frame(self, topic: StreamTopic, frame: Matlike) -> None:
         time_msg = self.node.get_clock().now().to_msg()
-        img_msg = self.bridge.cv2_to_imgmsg(img_rgb, encoding='rgb8')
+        img_msg: Image = self.bridge.cv2_to_imgmsg(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), 'rgb8')
         img_msg.header.stamp = time_msg
-        self.publishers[topic].publish(img_msg)
-
+        if topic in self.publishers:
+            self.publishers[topic].publish(img_msg)
+        else:
+            self.node.get_logger().warning(f'Invalid camera publisher topic "{topic.value}"')
 
 class LuxonisCamDriverNode(Node):
     def __init__(self) -> None:
-        super().__init__('luxonis_cam_driver')
+        super().__init__('luxonis_cam_driver', parameter_overrides=[])
 
         self.stream_metas = {
-            CAM_IDS.LUX_LEFT_RECT: StreamMeta.of(StreamTopic.RECT_LEFT, enabled=True),
-            CAM_IDS.LUX_RIGHT_RECT: StreamMeta.of(StreamTopic.RECT_RIGHT, enabled=True),
-            CAM_IDS.LUX_DISPARITY: StreamMeta.of(StreamTopic.DISPARITY, enabled=True),
-            CAM_IDS.LUX_DEPTH: StreamMeta.of(StreamTopic.DEPTH, enabled=True),
+            CAM_IDS.LUX_LEFT: StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
+            CAM_IDS.LUX_RIGHT: StreamMeta.of('right', StreamTopic.LUX_RAW, enabled=False),
+            CAM_IDS.LUX_LEFT_RECT: StreamMeta.of('left_rect', StreamTopic.RECT_LEFT, enabled=False),
+            CAM_IDS.LUX_RIGHT_RECT: StreamMeta.of('right_rect', StreamTopic.RECT_RIGHT, enabled=False),
+            CAM_IDS.LUX_DISPARITY: StreamMeta.of('disparity', StreamTopic.DISPARITY, enabled=False),
+            CAM_IDS.LUX_DEPTH: StreamMeta.of('depth', StreamTopic.DEPTH, enabled=False),
         }
+
+        self.frame_publishers = FramePublishers(self)
 
         self.cam_manage_service = self.create_service(
             CameraManage, 'manage_luxonis', self.cam_manage_callback
         )
-
         self.intrinsics_publishers = (
             self.create_publisher(Intrinsics, 'luxonis_left_intrinsics', QoSPresetProfiles.DEFAULT.value),
             self.create_publisher(Intrinsics, 'luxonis_right_intrinsics', QoSPresetProfiles.DEFAULT.value),
         )
 
-        self.frame_publishers = FramePublishers(self)
-
+        self.device = None
+        self.frame_nodes = {}
         self.deploy_pipeline()
         self.missed_sends = 0
 
-    def deploy_pipeline(self) -> None:
-        """Create and deploy DepthAI v3 pipeline"""
-        pipeline = dai.Pipeline()
-
-        # Camera setup
-        left_cam = pipeline.create(dai.node.Camera)
-        right_cam = pipeline.create(dai.node.Camera)
-
-        left_cam.setCamera("left")
-        right_cam.setCamera("right")
-        left_cam.setResolution(dai.CameraProperties.SensorResolution.THE_400_P)
-        right_cam.setResolution(dai.CameraProperties.SensorResolution.THE_400_P)
-        left_cam.setSize(FRAME_WIDTH, FRAME_HEIGHT)
-        right_cam.setSize(FRAME_WIDTH, FRAME_HEIGHT)
-
-        # Stereo node
-        stereo = pipeline.create(dai.node.StereoDepth)
-        stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-
-        left_cam.out.link(stereo.left)
-        right_cam.out.link(stereo.right)
-
-        # Deploy to device before querying connected cameras
-        self.device = dai.Device(pipeline)
-        detected_cams = self.device.getConnectedCameras()
-        self.get_logger().info(f"Detected cameras: {detected_cams}")
-
-        # Output queues
-        self.frame_output_queues = {
-            CAM_IDS.LUX_LEFT_RECT: stereo.rectifiedLeft.createOutputQueue(maxSize=1, blocking=False),
-            CAM_IDS.LUX_RIGHT_RECT: stereo.rectifiedRight.createOutputQueue(maxSize=1, blocking=False),
-            CAM_IDS.LUX_DISPARITY: stereo.disparity.createOutputQueue(maxSize=1, blocking=False),
-            CAM_IDS.LUX_DEPTH: stereo.depth.createOutputQueue(maxSize=1, blocking=False),
-        }
-
-        # Get intrinsics (if available)
-        calib = self.device.readCalibration()
-        self.intrinsics = []
-        try:
-            for i, cam in enumerate(["left", "right"]):
-                intr = calib.getCameraIntrinsics(cam)
-                self.intrinsics.append(intr)
-                fx_mm = intr[0][0] * 3 / 1000
-                self.get_logger().info(f"{cam} fx (mm): {fx_mm}")
-        except Exception as e:
-            self.get_logger().warn(f"Could not read intrinsics: {e}")
-
-        self.get_logger().info("Pipeline deployed to DepthAI v3 device")
-
-    def cam_manage_callback(self, request: CameraManage.Request, response: CameraManage.Response):
+    def cam_manage_callback(self, request: CameraManage.Request, response: CameraManage.Response) -> CameraManage.Response:
+        response.success = True
         if request.cam in self.stream_metas:
             self.stream_metas[request.cam].enabled = request.on
-            response.success = True
         else:
             response.success = False
-        statuses = [f"{cam}: {meta.enabled}" for cam, meta in self.stream_metas.items()]
-        self.get_logger().info("Luxonis stream states: " + "; ".join(statuses))
+
+        statuses = [f'{cam}: {meta.enabled}' for cam, meta in self.stream_metas.items()]
+        self.get_logger().info(f'Luxonis now publishing: {"; ".join(statuses)}')
         return response
 
-    def spin(self) -> None:
-        """Publish camera frames"""
-        try:
-            for cam_id, q in self.frame_output_queues.items():
-                if self.stream_metas[cam_id].enabled:
-                    frame = q.tryGet()
-                    if frame:
-                        topic = self.stream_metas[cam_id].topic
-                        self.frame_publishers.publish_frame(topic, frame)
-            self.missed_sends = 0
-        except RuntimeError as e:
-            self.missed_sends += 1
-            self.get_logger().warn(f"Frame grab failed: {e}")
+    def deploy_pipeline(self) -> None:
+        pipeline = dai.Pipeline()
 
-        if self.missed_sends >= MISSED_SENDS_RESET_THRESHOLD:
-            self.get_logger().error("Too many missed sends — redeploying pipeline")
-            self.deploy_pipeline()
-            self.missed_sends = 0
+        # Create cameras
+        left_cam = pipeline.create(dai.node.Camera).build()
+        right_cam = pipeline.create(dai.node.Camera).build()
+
+        # Request RGB outputs
+        left_out = left_cam.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), type=dai.ImgFrame.Type.RGB888p)
+        right_out = right_cam.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), type=dai.ImgFrame.Type.RGB888p)
+
+        # Stereo depth node
+        stereo = pipeline.create(dai.node.StereoDepth)
+        left_out.link(stereo.left)
+        right_out.link(stereo.right)
+
+        # Store frame nodes for later spin
+        self.frame_nodes[CAM_IDS.LUX_LEFT] = left_out
+        self.frame_nodes[CAM_IDS.LUX_RIGHT] = right_out
+        self.frame_nodes[CAM_IDS.LUX_LEFT_RECT] = stereo.rectifiedLeft
+        self.frame_nodes[CAM_IDS.LUX_RIGHT_RECT] = stereo.rectifiedRight
+        self.frame_nodes[CAM_IDS.LUX_DISPARITY] = stereo.disparity
+        self.frame_nodes[CAM_IDS.LUX_DEPTH] = stereo.depth
+
+        # Deploy pipeline to device
+        self.device = dai.Device(pipeline)
+
+        # Try to read intrinsics
+        calib_data = self.device.readCalibration()
+        self.intrinsics = []
+        try:
+            for cam_index, cam_socket in enumerate((0, 1)):  # Use 0/1 as left/right index
+                self.intrinsics.append(calib_data.getCameraIntrinsics(cam_socket))
+            self.get_logger().info(f'Focal lengths: {[self.intrinsics[0][0][0], self.intrinsics[1][1][1]]}')
+        except Exception:
+            self.get_logger().warn('Unable to get Luxonis intrinsics. Did you calibrate?')
+
+        self.get_logger().info('Pipeline deployed')
+
+    def spin(self) -> None:
+        if self.device is None:
+            return
+
+        for cam_id, frame_node in self.frame_nodes.items():
+            if self.stream_metas[cam_id].enabled:
+                frame = frame_node.tryGet()
+                if frame is not None:
+                    cv_frame = frame.getCvFrame()
+                    self.frame_publishers.publish_frame(self.stream_metas[cam_id].topic, cv_frame)
 
     def shutdown(self) -> None:
-        if hasattr(self, "device"):
+        if self.device:
             self.device.close()
-
 
 def main() -> None:
     rclpy.init()
-    node = LuxonisCamDriverNode()
+    driver_node = LuxonisCamDriverNode()
     executor = MultiThreadedExecutor()
 
     try:
-        while rclpy.ok():
-            rclpy.spin_once(node, executor=executor, timeout_sec=0)
-            node.spin()
+        while True:
+            rclpy.spin_once(driver_node, executor=executor, timeout_sec=0)
+            driver_node.spin()
     finally:
-        node.shutdown()
+        driver_node.shutdown()
