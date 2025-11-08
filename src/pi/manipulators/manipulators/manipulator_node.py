@@ -39,7 +39,11 @@ class Manipulator(Node):
                 self.state |= 2**pin  # Set the pin
 
             msg = i2c_msg.write(ADRRESS, [CMD_BYTE, self.state])
-            self.i2c.i2c_rdwr(msg)
+            try:
+                self.i2c.i2c_rdwr(msg)
+            except Exception as e:
+                print(e)
+
 
 
 def main() -> None:
