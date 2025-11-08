@@ -10,6 +10,7 @@ from gui.widgets.flood_warning import FloodWarning
 from gui.widgets.livestream_header import LivestreamHeader
 from gui.widgets.manip_status import ManipStatus
 from gui.widgets.timer import TimerDisplay
+from gui.widgets.millisecond_timer import MillisecondTimerWidget
 from gui.widgets.video_widget import (
     CameraDescription,
     CameraManager,
@@ -120,7 +121,9 @@ class PilotApp(App):
         left_layout = QVBoxLayout()
         left_layout.addWidget(ManipStatus('left'))
         left_layout.addWidget(TimerDisplay())
+        left_layout.addWidget(MillisecondTimerWidget())
         bottom_screen_layout.addLayout(left_layout)
+
 
         flood_widget = FloodWarning()
         bottom_screen_layout.addWidget(
