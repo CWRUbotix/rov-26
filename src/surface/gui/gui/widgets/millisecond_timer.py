@@ -1,6 +1,6 @@
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QLabel, QVBoxLayout
+
 
 class MillisecondTimerWidget(QLabel):
     def __init__(self) -> None:
