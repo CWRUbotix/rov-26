@@ -1,7 +1,6 @@
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
-
 
 class MillisecondTimerWidget(QWidget):
     def __init__(self):
@@ -22,7 +21,7 @@ class MillisecondTimerWidget(QWidget):
         self._timer = QTimer(self)
         self._timer.setInterval(10)
         self._timer.timeout.connect(self._on_timeout)
-        self._timer.start()
+        self._timer.start()        
 
     def _on_timeout(self) -> None:
         self._elapsed_ms += self._timer.interval()
