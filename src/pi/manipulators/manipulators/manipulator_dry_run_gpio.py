@@ -1,9 +1,8 @@
 import time
+
 import lgpio
 
-
 pin = 0
-
 
 def main() -> None:
     gpio_chip = lgpio.gpiochip_open(0)
@@ -19,8 +18,7 @@ def main() -> None:
         else:
             data = lgpio.gpio_write(gpio_chip, pin, 0)
 
-            print(f'data after manip switch:{data}')    
-        
+            print(f'data after manip switch:{data}')
         time.sleep(2)
         count+=1
 if __name__ == '__main__':
