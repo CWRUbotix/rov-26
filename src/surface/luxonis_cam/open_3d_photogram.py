@@ -90,37 +90,48 @@ class O3DNode(dai.node.ThreadedHostNode):
         target.estimate_normals()
         source = point_clouds[1]
 
-        trans_init = np.identity(4)
+        # trans_init = np.identity(4)
 
-        r = o3d.geometry.get_rotation_matrix_from_xyz((0, np.radians(-45), 0))
+        # r = o3d.geometry.get_rotation_matrix_from_xyz((0, np.radians(-45), 0))
 
-        trans_init = np.eye(4)
-        trans_init[:3, :3] = r
+        # trans_init = np.eye(4)
+        # trans_init[:3, :3] = r
 
-        voxel_size = 0.01
+
+        print("finished finding normals")
+        voxel_size = 0.05
         source_down = source.voxel_down_sample(voxel_size)
         target_down = target.voxel_down_sample(voxel_size)
 
+
+        print("after voxels")
         source_down.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+
+        print("after source_down normals")
 
         source_fpfh = o3d.pipelines.registration.compute_fpfh_feature(source_down,
                 o3d.geometry.KDTreeSearchParamHybrid(radius=0.25, max_nn=100))
         target_fpfh = o3d.pipelines.registration.compute_fpfh_feature(target_down,
                     o3d.geometry.KDTreeSearchParamHybrid(radius=0.25, max_nn=100))
+        
+        print("after fpfh")
 
         distance_threshold = 0.01
 
+        print("after distance threshold")
         result_ransac = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
             source_down, target_down, source_fpfh, target_fpfh, True,
             distance_threshold,
             o3d.pipelines.registration.TransformationEstimationForColoredICP(),
             3, [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
-                o3d.pipelines.registration.CorrespondenseCheckerBasedOnNormal(0.4)],
+                o3d.pipelines.registration.CorrespondenceCheckerBasedOnNormal(0.4)],
                 o3d.pipelines.registration.RANSACConvergenceCriteria(4000000, 500)
         )
 
-        trans_init = result_ransac.transformation
+        print("after ransac")
 
+        trans_init = result_ransac.transformation
+        print("after trans init")
 
         # draw_registration_result(source, target, trans_init)
         threshold = 0.02
