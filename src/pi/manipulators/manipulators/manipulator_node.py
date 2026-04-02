@@ -6,13 +6,19 @@ from smbus2 import SMBus, i2c_msg
 
 from rov_msgs.msg import Manip
 
-I2C_BUS = 6
-ADRRESS = 0x20
-CMD_BYTE = 0x06
+# I2C_BUS = 6
+# ADRRESS = 0x20
+# CMD_BYTE = 0x06
 
 
 class Manipulator(Node):
     def __init__(self) -> None:
+        gpio_chip = lgpio.gpiochip_open(0)
+        lgpio.gpio_claim_input(gpio_chip, pin1)
+        lgpio.gpio_write(gpio_chip, pin1, 0)
+        lgpio.gpio_claim_input(gpio_chip, pin2)
+        lgpio.gpio_write(gpio_chip, pin2, 0)
+
         super().__init__('manipulator', parameter_overrides=[])
 
         self.subscription = self.create_subscription(

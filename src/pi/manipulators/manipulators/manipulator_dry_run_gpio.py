@@ -2,8 +2,8 @@ import time
 
 import lgpio
 
-pin1 = 24
-pin2 = 26
+pin1 = 15
+pin2 = 16
 
 def main() -> None:
     gpio_chip = lgpio.gpiochip_open(0)
