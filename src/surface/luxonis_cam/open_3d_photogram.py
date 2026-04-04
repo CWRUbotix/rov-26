@@ -14,6 +14,8 @@ except ImportError:
         f"Critical dependency missing: Open3D. Please install it using the command: '{sys.executable} -m pip install open3d' and then rerun the script."  # noqa: E501
     )
 
+o3d.utility.set_verbosity_level(o3d.utility.VerbosityLevel.Debug)
+
 point_clouds = []
 
 def draw_registration_result(source, target, transformation) -> None:  # noqa: ANN001
@@ -116,16 +118,16 @@ class O3DNode(dai.node.ThreadedHostNode):
         
         print("after fpfh")
 
-        distance_threshold = 0.01
+        distance_threshold = 0.075
 
         print("after distance threshold")
         result_ransac = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
             source_down, target_down, source_fpfh, target_fpfh, True,
             distance_threshold,
-            o3d.pipelines.registration.TransformationEstimationForColoredICP(),
+            o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
             3, [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
-                o3d.pipelines.registration.CorrespondenceCheckerBasedOnNormal(0.4)],
-                o3d.pipelines.registration.RANSACConvergenceCriteria(4000000, 500)
+                o3d.pipelines.registration.CorrespondenceCheckerBasedOnNormal(distance_threshold)],
+                o3d.pipelines.registration.RANSACConvergenceCriteria(5000, 0.90)
         )
 
         print("after ransac")
