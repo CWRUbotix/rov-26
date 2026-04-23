@@ -140,13 +140,18 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
-        cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+        cv_image = self.get_cv_image(frame)
+        #self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
 
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
         )
 
         self.set_pixmap(QPixmap.fromImage(qt_image))
+
+    def get_cv_image(self, frame: Image) -> MatLike | None:
+        cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+        return cv_image
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -284,13 +289,24 @@ class PauseableVideoWidget(VideoWidget):
             GUINode().get_logger().error('Missing Layout')
 
         self.is_paused = False
+        self.ran_model = False
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         if not self.is_paused:
             super().handle_frame(frame)
+        elif self.is_paused and not self.ran_model:
+            cv_image = super().get_cv_image(frame)
+            # Run model on cv_image here
+            qt_image: QImage = self.convert_cv_qt(
+                cv_image, self.camera_description.width, self.camera_description.height
+            )
+            self.set_pixmap(QPixmap.fromImage(qt_image))
+            self.ran_model = True
 
     def toggle(self) -> None:
         """Toggle whether this widget is paused or playing."""
+        if self.is_paused:
+            self.ran_model = False
         self.is_paused = not self.is_paused
         self.button.setText(self.PAUSED_TEXT if self.is_paused else self.PLAYING_TEXT)
