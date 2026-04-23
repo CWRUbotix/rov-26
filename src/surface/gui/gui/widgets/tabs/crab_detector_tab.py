@@ -201,4 +201,3 @@ class CrabDetectorTab(QWidget):
             CrabDetectorTab.px_to_mm(self.intrinsics_right.fx),
             CrabDetectorTab.px_to_mm(self.intrinsics_right.fy),
         )
-        self.focal_length_label.setText(f'Focal lens (mm): {focal_left_mm} \t {focal_right_mm}')

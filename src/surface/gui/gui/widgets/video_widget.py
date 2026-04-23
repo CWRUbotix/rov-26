@@ -140,8 +140,8 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
-        cv_image = self.get_cv_image(frame)
-        #self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+        #cv_image = self.get_cv_image(frame)
+        cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
 
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
@@ -149,9 +149,9 @@ class VideoWidget(QWidget):
 
         self.set_pixmap(QPixmap.fromImage(qt_image))
 
-    def get_cv_image(self, frame: Image) -> MatLike | None:
-        cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-        return cv_image
+    #def get_cv_image(self, frame: Image) -> MatLike | None:
+    #    cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+    #    return cv_image
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -296,8 +296,9 @@ class PauseableVideoWidget(VideoWidget):
         if not self.is_paused:
             super().handle_frame(frame)
         elif self.is_paused and not self.ran_model:
-            cv_image = super().get_cv_image(frame)
-            # Run model on cv_image here
+            #cv_image = super().get_cv_image(frame)
+            cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+            # Run model on cv_image here - get how from Bren
             qt_image: QImage = self.convert_cv_qt(
                 cv_image, self.camera_description.width, self.camera_description.height
             )
