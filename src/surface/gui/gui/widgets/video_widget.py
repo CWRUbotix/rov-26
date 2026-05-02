@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import NamedTuple
 
+from pathlib import Path
+from ament_index_python.packages import get_package_share_directory
+
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
@@ -16,6 +19,7 @@ from sensor_msgs.msg import Image
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
 from rov_msgs.srv import CameraManage
+from ultralytics import YOLO
 
 # TODO: Ubuntu26+
 # Our own implementation of cv2.typing.MatLike until cv2.typing exists in a future ubuntu release
@@ -142,6 +146,12 @@ class VideoWidget(QWidget):
     def handle_frame(self, frame: Image) -> None:
         #cv_image = self.get_cv_image(frame)
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+        model = YOLO(str(
+            Path(get_package_share_directory('gui')) / 'best.pt'
+        ))
+
+        results = model(cv_image)
+        results[0].show()
 
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
