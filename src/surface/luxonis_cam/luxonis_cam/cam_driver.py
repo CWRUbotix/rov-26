@@ -366,6 +366,10 @@ while True:
         # unsure what preset mode to use, try this for now
         stereo_node.setDefaultProfilePreset(depthai.node.StereoDepth.PresetMode.HIGH_DETAIL)
 
+        # Helps with photogrammetry and measurement
+        stereo_node.setRectifyEdgeFillColor(0)
+        stereo_node.enableDistortionCorrection(True)
+
         # Connects the left_cam_node and right_cam_node to be inputs to the script
         left_cam_node.requestFullResolutionOutput().link(
             script.inputs[self.left_stereo_script_topics.script_input_name]
@@ -392,6 +396,9 @@ while True:
         )
         self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle_in'].createInputQueue()
         self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle_in'].createInputQueue()
+
+        # Node for creating color point clouds
+        rgbd = self.pipeline.create(depthai.node.RGBD).build()
 
         self.get_logger().info('Deploying pipeline...')
 
