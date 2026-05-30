@@ -9,6 +9,8 @@ uint8 LUX_RIGHT_RECT = 21
 uint8 LUX_DISPARITY = 22
 uint8 LUX_DEPTH = 23
 
+uint8 POINT_CLOUD = 30
+
 bool on
 uint8 cam
 ---

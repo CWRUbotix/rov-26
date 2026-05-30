@@ -14,6 +14,9 @@ from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import PointCloud2, PointField
+from sensor_msgs import point_cloud2
+from std_msgs.msg import Header
 
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
@@ -39,6 +42,9 @@ class StreamTopic(StrEnum):
     RECT_RIGHT = 'rect_right/image_raw'
     DISPARITY = 'disparity/image_raw'
     DEPTH = 'depth/image_raw'
+
+class PointStreamTopic(StrEnum):
+    POINT_CLOUD = 'rgbd/point_cloud'
 
 
 @dataclass
@@ -103,6 +109,43 @@ class StreamMeta:
             a mutable dataclass representing stream metadata
         """
         return StreamMeta(
+            topic=topic,
+            script_topics=StreamScriptTopicSet.of(stream_name),
+            enabled=enabled,
+        )
+
+@dataclass
+class PointStreamMeta:
+    """Mutable dataclass representing point cloud stream metadata.
+
+    Holds the ROS topic, StreamScriptTopicSet, and whether the stream is enabled
+    by default
+    """
+
+    topic: PointStreamTopic
+    script_topics: StreamScriptTopicSet
+    enabled: bool
+
+    @staticmethod
+    def of(stream_name: str, topic: PointStreamTopic, *, enabled: bool) -> 'PointStreamMeta':
+        """
+        Create a StreamMeta (factory method).
+
+        Parameters
+        ----------
+        stream_name : str
+            name of the stream
+        topic : StreamTopic
+            ROS topic the stream will be published on
+        enabled : bool
+            whether the stream is enabled by default
+
+        Returns
+        -------
+        StreamMeta
+            a mutable dataclass representing stream metadata
+        """
+        return PointStreamMeta(
             topic=topic,
             script_topics=StreamScriptTopicSet.of(stream_name),
             enabled=enabled,
@@ -192,6 +235,102 @@ class FramePublishers:
         img_msg.header.stamp = time
         return img_msg
 
+# Takes a ROS node, makes a ROS publisher for each ros topic it is going to use
+class PointFramePublishers:
+    """Singleton to manage publishing point cloud frames."""
+
+    def __init__(self, node: Node) -> None:
+        self.node = node
+        self.publishers = {topic: self.make_frame_publisher(topic) for topic in PointStreamTopic}
+        self.bridge = CvBridge()
+
+    def make_frame_publisher(self, topic: StreamTopic) -> Publisher:
+        """
+        Create a publisher for the specified topic.
+
+        Parameters
+        ----------
+        topic : StreamTopic
+            the topic to publish on
+
+        Returns
+        -------
+        Publisher
+            the new publisher
+        """
+        return self.node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
+
+    def try_get_publish(self, topic: StreamTopic, queue: depthai.MessageQueue) -> None:
+        """
+        Attempt to get a frame from the queue and publish it on the topic.
+
+        Parameters
+        ----------
+        topic : StreamTopic
+            topic to publish to
+        queue : depthai.MessageQueue
+            queue to read from (single read then give up, won't block long)
+        """
+        video_frame = queue.tryGet()
+
+        # Discard None (failed to get frame)
+        if video_frame is None:
+            return
+
+        # Type narrow to make mypy happy
+        if not isinstance(video_frame, depthai.ImgFrame):
+            self.node.get_logger().warn('Dequeued something other than an image frame, skipping')
+            return
+
+        time_msg = self.node.get_clock().now().to_msg()
+
+        if video_frame is not None:
+            img_msg = self.get_image_msg(video_frame.getCvFrame(), time_msg)
+            if topic in self.publishers:
+                self.publishers[topic].publish(img_msg)
+            else:
+                self.node.get_logger().warning(
+                    f'Invalid camera publisher topic "{topic.value}", not publishing'
+                )
+
+    def get_point_msg(self, points: Matlike, colors: Matlike, time: Time) -> PointCloud2:
+        """Convert cv2 image to ROS2 Image with CvBridge.
+
+        Parameters
+        ----------
+        image : Matlike
+            The image to convert
+        time : Time
+            The timestamp for the ros message
+
+        Returns
+        -------
+        PointCloud2
+            The ROS2 point cloud message
+        """
+        header = Header()
+        header.frame_id = "frame"
+
+        fields = [
+            PointField('x', 0, PointField.FLOAT32, 1),
+            PointField('y', 4, PointField.FLOAT32, 1),
+            PointField('z', 8, PointField.FLOAT32, 1),
+            PointField('r', 12, PointField.UINT8, 1),
+            PointField('g', 13, PointField.UINT8, 1),
+            PointField('b', 14, PointField.UINT8, 1),
+        ]
+
+        msg_points = []
+
+        for point, color in zip(points, colors):
+            msg_point = point
+            msg_point.extend(color[0:3])
+            msg_points.append(msg_point)
+
+        point_cloud = point_cloud2.create_cloud(header, fields, msg_points)
+
+        return point_cloud
+
 
 STREAMS_THAT_NEED_STEREO = [
     CAM_IDS.LUX_LEFT_RECT,
@@ -200,6 +339,9 @@ STREAMS_THAT_NEED_STEREO = [
     CAM_IDS.LUX_DEPTH,
 ]
 
+POINT_STREAMS_THAT_NEED_STEREO = [
+    CAM_IDS.POINT_CLOUD,
+]
 
 class LuxonisCamDriverNode(Node):
     def __init__(self) -> None:
@@ -216,12 +358,19 @@ class LuxonisCamDriverNode(Node):
             CAM_IDS.LUX_DEPTH: StreamMeta.of('depth', StreamTopic.DEPTH, enabled=False),
         }
 
+        self.point_stream_metas = {
+            CAM_IDS.POINT_CLOUD: PointStreamMeta.of('point_cloud', PointStreamTopic.POINT_CLOUD, enabled=False),
+        }
+
         self.left_stereo_script_topics = StreamScriptTopicSet.of('left_stereo')
         self.right_stereo_script_topics = StreamScriptTopicSet.of('right_stereo')
+        self.color_script_topics = StreamScriptTopicSet.of('color')
         self.script_topics = (
             *(meta.script_topics for meta in self.stream_metas.values()),
+            *(meta.script_topics for meta in self.point_stream_metas.values()),
             self.left_stereo_script_topics,
             self.right_stereo_script_topics,
+            self.color_script_topics,
         )
 
         self.cam_manage_service = self.create_service(
@@ -253,6 +402,7 @@ class LuxonisCamDriverNode(Node):
             self.get_logger().warn('Unable to get Luxonis intrinsics. Did you calibrate?')
 
         self.frame_publishers = FramePublishers(self)
+        self.point_frame_publishers = PointFramePublishers(self)
 
         self.get_logger().info('Pipeline created')
 
@@ -280,10 +430,13 @@ class LuxonisCamDriverNode(Node):
 
         if request.cam in self.stream_metas:
             self.stream_metas[request.cam].enabled = request.on
+        elif request.cam in self.point_stream_metas:
+            self.point_stream_metas[request.cam].enabled = request.on
         else:
             response.success = False
 
         statuses = [f'{cam}: {meta.enabled}' for cam, meta in self.stream_metas.items()]
+        statuses.extend([f'{cam}: {meta.enabled}' for cam, meta in self.point_stream_metas.items()])
         self.get_logger().info(f'Luxonis now publishing: {"; ".join(statuses)}')
 
         return response
@@ -323,12 +476,19 @@ class LuxonisCamDriverNode(Node):
             input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
             self.toggle_queues[cam_id] = input_queue
 
+        self.point_toggle_queues = {}
+        for cam_id, meta in self.point_stream_metas.items():
+            toggle_name = meta.script_topics.script_toggle_name
+            input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
+            self.point_toggle_queues[cam_id] = input_queue
+
         self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle'].createInputQueue(
             maxSize=1
         )
         self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle'].createInputQueue(
             maxSize=1
         )
+        self.color_toggle_queue = script.inputs['color_toggle'].createInputQueue(maxSize=1)
 
         # Link script outputs to stream_meta outputs
         self.frame_output_queues = {}
@@ -336,6 +496,12 @@ class LuxonisCamDriverNode(Node):
             output_name = stream_meta.script_topics.script_output_name
             output_queue = script.outputs[output_name].createOutputQueue(maxSize=1, blocking=False)
             self.frame_output_queues[cam_id] = output_queue
+
+        self.point_output_queues = {}
+        for cam_id, stream_meta in self.point_stream_metas.items():
+            output_name = stream_meta.script_topics.script_output_name
+            output_queue = script.outputs[output_name].createOutputQueue(maxSize=1, blocking=False)
+            self.point_output_queues[cam_id] = output_queue
 
         # Creates lists of which script topics are enabled, where to get the toggle
         # values, where to get the frames from if enabled, and where to output the frames to
@@ -370,12 +536,19 @@ while True:
         stereo_node.setRectifyEdgeFillColor(0)
         stereo_node.enableDistortionCorrection(True)
 
+        script.outputs[self.color_script_topics.script_output_name].link(stereo_node.inputAlignTo)
+
         # Connects the left_cam_node and right_cam_node to be inputs to the script
         left_cam_node.requestFullResolutionOutput().link(
             script.inputs[self.left_stereo_script_topics.script_input_name]
         )
         right_cam_node.requestFullResolutionOutput().link(
             script.inputs[self.right_stereo_script_topics.script_input_name]
+        )
+
+        # Get the left camera output to use for color
+        left_cam_node.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), depthai.ImgFrame.Type.RGB888i, depthai.ImgResizeMode.CROP, enableUndistortion=True).link(
+            script.inputs[self.color_script_topics.script_input_name]
         )
 
         # Connecting script outputs to the stereo node
@@ -399,6 +572,9 @@ while True:
 
         # Node for creating color point clouds
         rgbd = self.pipeline.create(depthai.node.RGBD).build()
+        script.outputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_output_name].link(rgbd.inColor)
+        script.outputs[self.color_script_topics.script_output_name].link(rgbd.inColor)
+        rgbd.pcl.link(script.inputs[self.stream_metas[CAM_IDS.POINT_CLOUD].script_topics.script_input_name])
 
         self.get_logger().info('Deploying pipeline...')
 
@@ -444,10 +620,20 @@ while True:
                     self.frame_publishers.try_get_publish(
                         self.stream_metas[cam_id].topic, output_queue
                     )
+            for cam_id, output_queue in self.point_output_queues.items():
+                if self.point_stream_metas[cam_id].enabled:
+                    self.point_frame_publishers.try_get_publish(
+                        self.point_stream_metas[cam_id].topic, output_queue
+                    )
 
             enable_stereo = False
             for cam_id in STREAMS_THAT_NEED_STEREO:
                 if self.stream_metas[cam_id].enabled:
+                    enable_stereo = True
+                    break
+
+            for cam_id in POINT_STREAMS_THAT_NEED_STEREO:
+                if self.point_stream_metas[cam_id].enabled:
                     enable_stereo = True
                     break
 
@@ -456,6 +642,7 @@ while True:
             # Send whether the stereo is enabled using the buffer and it toggles the stereo
             self.left_stereo_toggle_queue.send(buf)
             self.right_stereo_toggle_queue.send(buf)
+            self.color_toggle_queue.send(buf)
 
             # Use the toggle queues to send whether each stream meta should be enabled
             for cam_id, toggle_queue in self.toggle_queues.items():
@@ -464,6 +651,13 @@ while True:
                     np.array([1 if self.stream_metas[cam_id].enabled else 0], dtype=np.uint8)
                 )
                 toggle_queue.send(buf)
+
+            for cam_id, point_toggle_queue in self.point_toggle_queues.items():
+                buf = depthai.Buffer()
+                buf.setData(
+                    np.array([1 if self.point_stream_metas[cam_id].enabled else 0], dtype=np.uint8)
+                )
+                point_toggle_queue.send(buf)
 
             self.missed_sends = 0
         except RuntimeError as e:

@@ -182,12 +182,14 @@ with dai.Pipeline() as p:
     right.requestOutput((640, 400)).link(stereo.right)
     platform = p.getDefaultDevice().getPlatform()
     if platform == dai.Platform.RVC4:
+        print('use image align')
         out = left.requestOutput((640, 400), dai.ImgFrame.Type.RGB888i, enableUndistortion=True)
         align = p.create(dai.node.ImageAlign)
         stereo.depth.link(align.input)
         out.link(align.inputAlignTo)
         align.outputAligned.link(rgbd.inDepth)
     else:
+        print('use rgbd')
         out = left.requestOutput(
             (640, 400), dai.ImgFrame.Type.RGB888i, dai.ImgResizeMode.CROP, 30, True
         )
