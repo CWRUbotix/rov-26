@@ -13,9 +13,8 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
-from sensor_msgs.msg import Image
-from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs import point_cloud2
+from sensor_msgs.msg import Image, PointCloud2, PointField
 from std_msgs.msg import Header
 
 from rov_msgs.msg import Intrinsics
@@ -244,7 +243,7 @@ class PointFramePublishers:
         self.publishers = {topic: self.make_frame_publisher(topic) for topic in PointStreamTopic}
         self.bridge = CvBridge()
 
-    def make_frame_publisher(self, topic: StreamTopic) -> Publisher:
+    def make_frame_publisher(self, topic: PointStreamTopic) -> Publisher:
         """
         Create a publisher for the specified topic.
 
@@ -258,9 +257,9 @@ class PointFramePublishers:
         Publisher
             the new publisher
         """
-        return self.node.create_publisher(Image, topic.value, QoSPresetProfiles.DEFAULT.value)
+        return self.node.create_publisher(PointCloud2, topic.value, QoSPresetProfiles.DEFAULT.value)
 
-    def try_get_publish(self, topic: StreamTopic, queue: depthai.MessageQueue) -> None:
+    def try_get_publish(self, topic: PointStreamTopic, queue: depthai.MessageQueue) -> None:
         """
         Attempt to get a frame from the queue and publish it on the topic.
 
@@ -271,29 +270,29 @@ class PointFramePublishers:
         queue : depthai.MessageQueue
             queue to read from (single read then give up, won't block long)
         """
-        video_frame = queue.tryGet()
+        point_frame = queue.tryGet()
 
         # Discard None (failed to get frame)
-        if video_frame is None:
+        if point_frame is None:
             return
 
         # Type narrow to make mypy happy
-        if not isinstance(video_frame, depthai.ImgFrame):
-            self.node.get_logger().warn('Dequeued something other than an image frame, skipping')
+        if not isinstance(point_frame, depthai.PointCloudData):
+            self.node.get_logger().warn('Dequeued something other than a point frame, skipping')
             return
 
         time_msg = self.node.get_clock().now().to_msg()
 
-        if video_frame is not None:
-            img_msg = self.get_image_msg(video_frame.getCvFrame(), time_msg)
+        if point_frame is not None:
+            point_msg = self.get_point_msg(point_frame, time_msg)
             if topic in self.publishers:
-                self.publishers[topic].publish(img_msg)
+                self.publishers[topic].publish(point_msg)
             else:
                 self.node.get_logger().warning(
                     f'Invalid camera publisher topic "{topic.value}", not publishing'
                 )
 
-    def get_point_msg(self, points: Matlike, colors: Matlike, time: Time) -> PointCloud2:
+    def get_point_msg(self, point_cloud_data: depthai.PointCloudData, time: Time) -> PointCloud2:
         """Convert cv2 image to ROS2 Image with CvBridge.
 
         Parameters
@@ -308,8 +307,10 @@ class PointFramePublishers:
         PointCloud2
             The ROS2 point cloud message
         """
+        points, colors = point_cloud_data.getPointsRGB()
+
         header = Header()
-        header.frame_id = "frame"
+        header.frame_id = 'frame'
 
         fields = [
             PointField('x', 0, PointField.FLOAT32, 1),

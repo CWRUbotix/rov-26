@@ -8,11 +8,11 @@ from gui.widgets.heartbeat import HeartbeatWidget
 from gui.widgets.ip_widget import IPWidget
 from gui.widgets.logger import Logger
 from gui.widgets.tabs.general_debug_tab import GeneralDebugTab
-from gui.widgets.tabs.shipwreck import ShipwreckTab
+from gui.widgets.tabs.measurement import MeasurementTab
 from gui.widgets.temperature import TemperatureSensor
 from gui.widgets.timer import InteractiveTimer
 
-SHIPWRECK_TEXT = 'Shipwreck'
+MEASUREMENT_TEXT = 'Measurement'
 
 
 class OperatorApp(App):
@@ -21,7 +21,7 @@ class OperatorApp(App):
     def __init__(self) -> None:
         super().__init__('operator_gui_node')
 
-        self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
+        self.setWindowTitle('Operator GUI - CWRUbotix ROV 2026')
 
         # Main tab
         main_tab = QWidget()
@@ -54,8 +54,8 @@ class OperatorApp(App):
         self.tabs = QTabWidget()
         self.tabs.addTab(main_tab, 'Main')
         self.tabs.addTab(GeneralDebugTab(), 'General Debug')
-        self.shipwreck_tab = ShipwreckTab()
-        self.tabs.addTab(self.shipwreck_tab, SHIPWRECK_TEXT)
+        self.shipwreck_tab = MeasurementTab()
+        self.tabs.addTab(self.shipwreck_tab, MEASUREMENT_TEXT)
         self.tabs.currentChanged.connect(self.changed_tabs)
         root_layout.addWidget(self.tabs)
 
@@ -63,7 +63,7 @@ class OperatorApp(App):
 
     @pyqtSlot(int)
     def tab_change_slot(self, index: int) -> None:
-        if self.tabs.tabText(index) == SHIPWRECK_TEXT:
+        if self.tabs.tabText(index) == MEASUREMENT_TEXT:
             # Allow keyboard events
             self.shipwreck_tab.setFocus(Qt.FocusReason.TabFocusReason)
 
