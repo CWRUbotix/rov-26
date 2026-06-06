@@ -24,6 +24,7 @@ endif()
 
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Manip.msg"
@@ -40,11 +41,13 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FloatSerial.msg"
   "msg/FloatSingle.msg"
   "msg/Intrinsics.msg"
+  "msg/Measurement.msg"
   "srv/AutonomousFlight.srv"
   "srv/MissionTimerSet.srv"
   "srv/CameraManage.srv"
   "srv/VehicleArming.srv"
   DEPENDENCIES std_msgs
+  DEPENDENCIES geometry_msgs
 )
 
 ament_package()

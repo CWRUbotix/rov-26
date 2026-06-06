@@ -14,6 +14,8 @@ from gui.widgets.video_widget import (
     SwitchableVideoWidget,
 )
 from rov_msgs.srv import CameraManage
+from std_msgs.msg import Bool
+from rclpy.qos import qos_profile_default
 
 FRAME_WIDTH = 816
 FRAME_HEIGHT = 510
@@ -39,13 +41,15 @@ class MeasurementTab(QWidget):
     def __init__(self) -> None:
         super().__init__()
 
-        point_cloud_manager = CameraManager('manage_luxonis', CameraManage.Request.POINT_CLOUD)
+        self.point_cloud_manager = CameraManager('manage_luxonis', CameraManage.Request.POINT_CLOUD)
+        self.measurement_start_publisher = GUINode().create_publisher(Bool,
+                                        'measurement_start', qos_profile_default)
 
         videos = self.make_videos()
 
         capture_btn = QPushButton()
 
-        capture_btn.clicked.connect(lambda: point_cloud_manager.set_cam_state(on=True))
+        capture_btn.clicked.connect(self.start_point_cloud_capture)
 
         root_layout = QVBoxLayout()
         root_layout.addWidget(videos)
@@ -109,3 +113,8 @@ class MeasurementTab(QWidget):
         coarse_tab.setLayout(cam_layout)
 
         return coarse_tab
+
+    def start_point_cloud_capture(self) -> None:
+        self.point_cloud_manager.set_cam_state(on=True)
+        self.measurement_start_publisher.publish(Bool(data=True))
+
