@@ -626,6 +626,8 @@ while True:
                     self.point_frame_publishers.try_get_publish(
                         self.point_stream_metas[cam_id].topic, output_queue
                     )
+                    self.get_logger().debug('Published a point cloud')
+                    self.point_stream_metas[cam_id].enabled = False
 
             enable_stereo = False
             for cam_id in STREAMS_THAT_NEED_STEREO:
