@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from tokenize import String
 
 import cv2
 import depthai
@@ -121,6 +122,7 @@ class FramePublishers:
         self.node = node
         self.publishers = {topic: self.make_frame_publisher(topic) for topic in StreamTopic}
         self.bridge = CvBridge()
+        
 
     def make_frame_publisher(self, topic: StreamTopic) -> Publisher:
         """
@@ -204,6 +206,8 @@ STREAMS_THAT_NEED_STEREO = [
 class LuxonisCamDriverNode(Node):
     def __init__(self) -> None:
         super().__init__('luxonis_cam_driver', parameter_overrides=[])
+        self.subscription = self.create_subscription(String, "camSize", self.listener_callback, 10)
+    
 
         self.stream_metas = {
             CAM_IDS.LUX_LEFT: StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
@@ -257,6 +261,9 @@ class LuxonisCamDriverNode(Node):
         self.get_logger().info('Pipeline created')
 
         self.missed_sends = 0
+    def listener_callback(self, msg):
+        print("********************")
+        print(msg.data)
 
     def cam_manage_callback(
         self, request: CameraManage.Request, response: CameraManage.Response
@@ -311,6 +318,9 @@ class LuxonisCamDriverNode(Node):
         ):
             input_name = meta.script_topics.script_input_name
             node.requestOutput(
+                #I think we can just change frame width and frame height
+                #If this doesn't work, we can try size=(width, height),
+                # not sure what size we need to make it
                 (FRAME_WIDTH, FRAME_HEIGHT), type=depthai.ImgFrame.Type.RGB888p
             ).link(script.inputs[input_name])
             script.inputs[input_name].setBlocking(False)
@@ -394,6 +404,7 @@ while True:
         self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle_in'].createInputQueue()
 
         self.get_logger().info('Deploying pipeline...')
+        
 
         # Deploy pipeline to device
         while True:

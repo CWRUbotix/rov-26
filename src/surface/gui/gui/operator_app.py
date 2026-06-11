@@ -1,5 +1,7 @@
+from tokenize import String
+
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QHBoxLayout, QTabWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
 from gui.app import App
 from gui.widgets.float_comm import FloatComm
@@ -22,7 +24,7 @@ class OperatorApp(App):
         super().__init__('operator_gui_node')
 
         self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
-
+        self.publisher = self.create_publisher(String, "camSize", 10)
         # Main tab
         main_tab = QWidget()
         main_layout = QHBoxLayout()
@@ -56,6 +58,9 @@ class OperatorApp(App):
         self.tabs.addTab(GeneralDebugTab(), 'General Debug')
         self.shipwreck_tab = ShipwreckTab()
         self.tabs.addTab(self.shipwreck_tab, SHIPWRECK_TEXT)
+        self.button = QPushButton("Click Me")
+        root_layout.addWidget(self.button)
+        self.button.clicked.connect(self.on_button_clicked)
         self.tabs.currentChanged.connect(self.changed_tabs)
         root_layout.addWidget(self.tabs)
 
@@ -66,6 +71,11 @@ class OperatorApp(App):
         if self.tabs.tabText(index) == SHIPWRECK_TEXT:
             # Allow keyboard events
             self.shipwreck_tab.setFocus(Qt.FocusReason.TabFocusReason)
+    
+    def on_button_clicked(self):
+        print("**************************button clicked**********************")
+        
+        self.publisher_.publish("HI")
 
 
 def run_gui_operator() -> None:
