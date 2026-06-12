@@ -25,7 +25,6 @@ setup(
     maintainer_email='gcm49@case.edu, rmc170@case.edu',
     description='Code for manipulators',
     license='Apache 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'manipulators = manipulators.manipulator_node:main',

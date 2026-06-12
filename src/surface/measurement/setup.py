@@ -23,7 +23,6 @@ setup(
     maintainer_email='svg33@case.edu',
     description='Mate ROV measurement code',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'measurement = measurement.measurement_calculator:main',

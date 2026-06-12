@@ -311,6 +311,7 @@ class PointFramePublishers:
 
         header = Header()
         header.frame_id = 'frame'
+        header.stamp = time
 
         fields = [
             PointField('x', 0, PointField.FLOAT32, 1),
@@ -323,7 +324,7 @@ class PointFramePublishers:
 
         msg_points = []
 
-        for point, color in zip(points, colors):
+        for point, color in zip(points, colors, strict=False):
             msg_point = point
             msg_point.extend(color[0:3])
             msg_points.append(msg_point)
@@ -360,7 +361,8 @@ class LuxonisCamDriverNode(Node):
         }
 
         self.point_stream_metas = {
-            CAM_IDS.POINT_CLOUD: PointStreamMeta.of('point_cloud', PointStreamTopic.POINT_CLOUD, enabled=False),
+            CAM_IDS.POINT_CLOUD: PointStreamMeta.of('point_cloud',
+                                PointStreamTopic.POINT_CLOUD, enabled=False),
         }
 
         self.left_stereo_script_topics = StreamScriptTopicSet.of('left_stereo')
@@ -470,26 +472,7 @@ class LuxonisCamDriverNode(Node):
             script.inputs[input_name].setBlocking(False)
             script.inputs[input_name].setMaxSize(1)
 
-        # create toggle input queues
-        self.toggle_queues = {}
-        for cam_id, meta in self.stream_metas.items():
-            toggle_name = meta.script_topics.script_toggle_name
-            input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
-            self.toggle_queues[cam_id] = input_queue
-
-        self.point_toggle_queues = {}
-        for cam_id, meta in self.point_stream_metas.items():
-            toggle_name = meta.script_topics.script_toggle_name
-            input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
-            self.point_toggle_queues[cam_id] = input_queue
-
-        self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle'].createInputQueue(
-            maxSize=1
-        )
-        self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle'].createInputQueue(
-            maxSize=1
-        )
-        self.color_toggle_queue = script.inputs['color_toggle'].createInputQueue(maxSize=1)
+        self.create_toggle_queues(script)
 
         # Link script outputs to stream_meta outputs
         self.frame_output_queues = {}
@@ -535,7 +518,7 @@ while True:
 
         # Helps with photogrammetry and measurement
         stereo_node.setRectifyEdgeFillColor(0)
-        stereo_node.enableDistortionCorrection(True)
+        stereo_node.enableDistortionCorrection(arg0=True)
 
         script.outputs[self.color_script_topics.script_output_name].link(stereo_node.inputAlignTo)
 
@@ -548,28 +531,12 @@ while True:
         )
 
         # Get the left camera output to use for color
-        left_cam_node.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), depthai.ImgFrame.Type.RGB888i, depthai.ImgResizeMode.CROP, enableUndistortion=True).link(
+        left_cam_node.requestOutput((FRAME_WIDTH, FRAME_HEIGHT), depthai.ImgFrame.Type.RGB888i,
+            depthai.ImgResizeMode.CROP, enableUndistortion=True).link(
             script.inputs[self.color_script_topics.script_input_name]
         )
 
-        # Connecting script outputs to the stereo node
-        script.outputs[self.left_stereo_script_topics.script_output_name].link(stereo_node.left)
-        script.outputs[self.right_stereo_script_topics.script_output_name].link(stereo_node.right)
-
-        stereo_node.rectifiedLeft.link(
-            script.inputs[self.stream_metas[CAM_IDS.LUX_LEFT_RECT].script_topics.script_input_name]
-        )
-        stereo_node.rectifiedRight.link(
-            script.inputs[self.stream_metas[CAM_IDS.LUX_RIGHT_RECT].script_topics.script_input_name]
-        )
-        stereo_node.disparity.link(
-            script.inputs[self.stream_metas[CAM_IDS.LUX_DISPARITY].script_topics.script_input_name]
-        )
-        stereo_node.depth.link(
-            script.inputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_input_name]
-        )
-        self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle_in'].createInputQueue()
-        self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle_in'].createInputQueue()
+        self.deploy_stereo_node(script=script, stereo_node=stereo_node)
 
         # Node for creating color point clouds
         rgbd = self.pipeline.create(depthai.node.RGBD).build()
@@ -597,6 +564,48 @@ while True:
 
         self.get_logger().info('Pipeline deployed')
 
+    def create_toggle_queues(self, script: depthai.Script) -> None:
+        # create toggle input queues
+        self.toggle_queues = {}
+        for cam_id, meta in self.stream_metas.items():
+            toggle_name = meta.script_topics.script_toggle_name
+            input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
+            self.toggle_queues[cam_id] = input_queue
+
+        self.point_toggle_queues = {}
+        for cam_id, meta in self.point_stream_metas.items():
+            toggle_name = meta.script_topics.script_toggle_name
+            input_queue = script.inputs[toggle_name].createInputQueue(maxSize=1)
+            self.point_toggle_queues[cam_id] = input_queue
+
+        self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle'].createInputQueue(
+            maxSize=1
+        )
+        self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle'].createInputQueue(
+            maxSize=1
+        )
+        self.color_toggle_queue = script.inputs['color_toggle'].createInputQueue(maxSize=1)
+
+    def deploy_stereo_node(self, stereo_node: depthai.StereoDepth, script: depthai.Script) -> None:
+        # Connecting script outputs to the stereo node
+        script.outputs[self.left_stereo_script_topics.script_output_name].link(stereo_node.left)
+        script.outputs[self.right_stereo_script_topics.script_output_name].link(stereo_node.right)
+
+        stereo_node.rectifiedLeft.link(
+            script.inputs[self.stream_metas[CAM_IDS.LUX_LEFT_RECT].script_topics.script_input_name]
+        )
+        stereo_node.rectifiedRight.link(
+            script.inputs[self.stream_metas[CAM_IDS.LUX_RIGHT_RECT].script_topics.script_input_name]
+        )
+        stereo_node.disparity.link(
+            script.inputs[self.stream_metas[CAM_IDS.LUX_DISPARITY].script_topics.script_input_name]
+        )
+        stereo_node.depth.link(
+            script.inputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_input_name]
+        )
+        self.left_stereo_toggle_queue = script.inputs['left_stereo_toggle_in'].createInputQueue()
+        self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle_in'].createInputQueue()
+
     def spin(self) -> None:
         """Run one iteration of I/O with the Luxonis cam."""
         if len(self.intrinsics) == len(self.intrinsics_publishers):
@@ -615,54 +624,8 @@ while True:
                 )
 
         try:
-            # TODO: only send toggles when we actually need to change state?
-            for cam_id, output_queue in self.frame_output_queues.items():
-                if self.stream_metas[cam_id].enabled:
-                    self.frame_publishers.try_get_publish(
-                        self.stream_metas[cam_id].topic, output_queue
-                    )
-            for cam_id, output_queue in self.point_output_queues.items():
-                if self.point_stream_metas[cam_id].enabled:
-                    self.point_frame_publishers.try_get_publish(
-                        self.point_stream_metas[cam_id].topic, output_queue
-                    )
-                    self.get_logger().debug('Published a point cloud')
-                    self.point_stream_metas[cam_id].enabled = False
-
-            enable_stereo = False
-            for cam_id in STREAMS_THAT_NEED_STEREO:
-                if self.stream_metas[cam_id].enabled:
-                    enable_stereo = True
-                    break
-
-            for cam_id in POINT_STREAMS_THAT_NEED_STEREO:
-                if self.point_stream_metas[cam_id].enabled:
-                    enable_stereo = True
-                    break
-
-            buf = depthai.Buffer()  # TODO: can we create this once and reuse?
-            buf.setData(np.array([1 if enable_stereo else 0], dtype=np.uint8))
-            # Send whether the stereo is enabled using the buffer and it toggles the stereo
-            self.left_stereo_toggle_queue.send(buf)
-            self.right_stereo_toggle_queue.send(buf)
-            self.color_toggle_queue.send(buf)
-
-            # Use the toggle queues to send whether each stream meta should be enabled
-            for cam_id, toggle_queue in self.toggle_queues.items():
-                buf = depthai.Buffer()
-                buf.setData(
-                    np.array([1 if self.stream_metas[cam_id].enabled else 0], dtype=np.uint8)
-                )
-                toggle_queue.send(buf)
-
-            for cam_id, point_toggle_queue in self.point_toggle_queues.items():
-                buf = depthai.Buffer()
-                buf.setData(
-                    np.array([1 if self.point_stream_metas[cam_id].enabled else 0], dtype=np.uint8)
-                )
-                point_toggle_queue.send(buf)
-
-            self.missed_sends = 0
+            self.publish_frames()
+            self.update_toggles()
         except RuntimeError as e:
             self.missed_sends += 1
             self.get_logger().warn('Missed a dual cam spin')
@@ -693,6 +656,56 @@ while True:
         if self.pipeline:
             self.pipeline.__exit__(None, None, None)
 
+    def publish_frames(self) -> None:
+        # TODO: only send toggles when we actually need to change state?
+        for cam_id, output_queue in self.frame_output_queues.items():
+            if self.stream_metas[cam_id].enabled:
+                self.frame_publishers.try_get_publish(
+                    self.stream_metas[cam_id].topic, output_queue
+                )
+        for cam_id, output_queue in self.point_output_queues.items():
+            if self.point_stream_metas[cam_id].enabled:
+                self.point_frame_publishers.try_get_publish(
+                    self.point_stream_metas[cam_id].topic, output_queue
+                )
+                self.get_logger().debug('Published a point cloud')
+                self.point_stream_metas[cam_id].enabled = False
+
+    def update_toggles(self) -> None:
+        enable_stereo = False
+        for cam_id in STREAMS_THAT_NEED_STEREO:
+            if self.stream_metas[cam_id].enabled:
+                enable_stereo = True
+                break
+
+        for cam_id in POINT_STREAMS_THAT_NEED_STEREO:
+            if self.point_stream_metas[cam_id].enabled:
+                enable_stereo = True
+                break
+
+        buf = depthai.Buffer()  # TODO: can we create this once and reuse?
+        buf.setData(np.array([1 if enable_stereo else 0], dtype=np.uint8))
+        # Send whether the stereo is enabled using the buffer and it toggles the stereo
+        self.left_stereo_toggle_queue.send(buf)
+        self.right_stereo_toggle_queue.send(buf)
+        self.color_toggle_queue.send(buf)
+
+        # Use the toggle queues to send whether each stream meta should be enabled
+        for cam_id, toggle_queue in self.toggle_queues.items():
+            buf = depthai.Buffer()
+            buf.setData(
+                np.array([1 if self.stream_metas[cam_id].enabled else 0], dtype=np.uint8)
+            )
+            toggle_queue.send(buf)
+
+        for cam_id, point_toggle_queue in self.point_toggle_queues.items():
+            buf = depthai.Buffer()
+            buf.setData(
+                np.array([1 if self.point_stream_metas[cam_id].enabled else 0], dtype=np.uint8)
+            )
+            point_toggle_queue.send(buf)
+
+        self.missed_sends = 0
 
 def main() -> None:
     rclpy.init()

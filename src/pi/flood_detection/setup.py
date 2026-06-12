@@ -23,7 +23,6 @@ setup(
     maintainer_email='rmc@carlstrom.com',
     description='Flood detection',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'flood_detector = flood_detection.flood_detector:main',

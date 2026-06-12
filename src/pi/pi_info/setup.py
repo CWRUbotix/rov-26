@@ -23,7 +23,6 @@ setup(
     maintainer_email='noah@mollerstuen.com',
     description='Node to send perodic heartbeat messages to the surface',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'heartbeat_node = pi_info.heartbeat_node:main',

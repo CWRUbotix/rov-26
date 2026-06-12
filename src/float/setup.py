@@ -16,7 +16,6 @@ setup(
     maintainer_email='bwp18@case.edu',
     description='Mate ROV sub movement controllers',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [],
     },

@@ -23,7 +23,6 @@ setup(
     maintainer_email='ery12@case.edu',
     description='Mate ROV transceiver communication code',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'serial = transceiver.serial_reader:main',
