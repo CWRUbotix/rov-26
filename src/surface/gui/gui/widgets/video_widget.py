@@ -186,8 +186,7 @@ class VideoWidget(QWidget):
         
         
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
-        w = qt_image.width()
-        h = qt_image.height()
+     
 
         zoom = 2.0  # 2x zoom
 
