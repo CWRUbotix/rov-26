@@ -1,13 +1,12 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import NamedTuple
-
 from pathlib import Path
-from ament_index_python.packages import get_package_share_directory
+from typing import NamedTuple
 
 import cv2
 import numpy as np
+from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from numpy.typing import NDArray
 from PyQt6.QtCore import Qt, pyqtBoundSignal, pyqtSignal, pyqtSlot
@@ -15,11 +14,11 @@ from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from rclpy.qos import qos_profile_default
 from sensor_msgs.msg import Image
+from ultralytics import YOLO
 
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
 from rov_msgs.srv import CameraManage
-from ultralytics import YOLO
 
 # TODO: Ubuntu26+
 # Our own implementation of cv2.typing.MatLike until cv2.typing exists in a future ubuntu release
@@ -144,24 +143,13 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
-        #cv_image = self.get_cv_image(frame)
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-        model = YOLO(str(
-            Path(get_package_share_directory('gui')) / 'best.pt'
-        ))
-
-        results = model(cv_image)
-        results[0].show()
 
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
         )
 
         self.set_pixmap(QPixmap.fromImage(qt_image))
-
-    #def get_cv_image(self, frame: Image) -> MatLike | None:
-    #    cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-    #    return cv_image
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -308,7 +296,13 @@ class PauseableVideoWidget(VideoWidget):
         elif self.is_paused and not self.ran_model:
             #cv_image = super().get_cv_image(frame)
             cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-            # Run model on cv_image here - get how from Bren
+            # Run model on cv_image
+            model = YOLO(str(
+                Path(get_package_share_directory('gui')) / 'best.pt'
+            ))
+
+            results = model(cv_image)
+            results[0].show()
             qt_image: QImage = self.convert_cv_qt(
                 cv_image, self.camera_description.width, self.camera_description.height
             )
