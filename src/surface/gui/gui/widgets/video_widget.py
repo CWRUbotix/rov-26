@@ -25,9 +25,12 @@ from rov_msgs.srv import CameraManage
 # MatLike = NDArray[np.integer[Any] | np.floating[Any]]
 MatLike = NDArray[np.generic]
 
-WIDTH = 721
-HEIGHT = 541
+# WIDTH = 721
+# HEIGHT = 541
 # 1 Pixel larger than actual pixel dimensions
+
+WIDTH = 100
+HEIGHT = 100
 
 
 COLOR = 3
