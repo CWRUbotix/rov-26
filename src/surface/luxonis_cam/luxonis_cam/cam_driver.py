@@ -8,7 +8,6 @@ import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
-from numpy import generic
 from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -19,7 +18,7 @@ from rov_msgs.msg import CropCam
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
 
-Matlike = NDArray[generic]
+Matlike = NDArray[np.uint8]
 
 # Stores the calibration
 LEFT_CAM_SOCKET = depthai.CameraBoardSocket.CAM_A
@@ -191,7 +190,7 @@ class FramePublishers:
         Image
             The ROS2 image message
         """
-        inverted_image = cv2.cvtColor(image.astype(int), cv2.COLOR_BGR2RGB)
+        inverted_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_msg: Image = self.bridge.cv2_to_imgmsg(inverted_image)
         img_msg.encoding = 'rgb8'
         img_msg.header.stamp = time
