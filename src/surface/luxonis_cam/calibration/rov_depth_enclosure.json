@@ -11,7 +11,7 @@
                 "extrinsics": {
                     "to_cam": "CAM_D",
                     "specTranslation": {
-                        "x": 6.11,
+                        "x": -6.06,
                         "y": 0,
                         "z": 0
                     },
