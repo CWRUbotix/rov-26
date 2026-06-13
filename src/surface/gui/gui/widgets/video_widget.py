@@ -186,8 +186,9 @@ class VideoWidget(QWidget):
 
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
         qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        cropped = qt_image.copy(100, 50, 100, 100)
 
-        return qt_image
+        return cropped
 
 
 class SwitchableVideoWidget(VideoWidget):
