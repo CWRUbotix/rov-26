@@ -165,7 +165,7 @@ class VideoWidget(QWidget):
             w,
             h,
             Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+            Qt.TransformationMode.FastTransformation,
         )
         
 
