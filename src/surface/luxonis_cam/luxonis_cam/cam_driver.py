@@ -7,8 +7,6 @@ import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
-from numpy import generic
-from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
@@ -18,7 +16,7 @@ from sensor_msgs.msg import Image
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
 
-Matlike = NDArray[generic]
+Matlike = cv2.typing.MatLike
 
 # Stores the calibration
 LEFT_CAM_SOCKET = depthai.CameraBoardSocket.CAM_A
