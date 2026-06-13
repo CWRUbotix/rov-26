@@ -58,8 +58,8 @@ class MeasurementCalculator(Node):
 
         if selected_points.length == NUM_POINTS_NEEDED:
             # Retrieve the points from the list
-            point1 = points[selected_points[0]]
-            point2 = points[selected_points[1]]
+            point1 = points[selected_points[0]][:3]
+            point2 = points[selected_points[1]][:3]
 
             # Find the distance, divide by 10 so that it is in cm
             distance = np.linalg.norm(point1 - point2) / 10.0
