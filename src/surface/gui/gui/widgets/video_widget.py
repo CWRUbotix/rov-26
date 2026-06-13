@@ -144,14 +144,11 @@ class VideoWidget(QWidget):
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-
-        qt_image: QImage = self.convert_cv_qt(
-            cv_image, self.camera_description.width, self.camera_description.height
-        )
-        w = self.camera_description.width
-        h = self.camera_description.height
         
-        zoom = 2.0  # 2x zoom
+        
+        h, w = frame.shape[:2]
+
+        zoom = 2.0
 
         crop_w = int(w / zoom)
         crop_h = int(h / zoom)
@@ -159,17 +156,33 @@ class VideoWidget(QWidget):
         x = (w - crop_w) // 2
         y = (h - crop_h) // 2
 
-        cropped = qt_image.copy(x, y, crop_w, crop_h)
+        cropped = frame[y:y+crop_h, x:x+crop_w]
 
-        zoomed = cropped.scaled(
-            w,
-            h,
-            Qt.AspectRatioMode.IgnoreAspectRatio,
-            Qt.TransformationMode.FastTransformation,
+        qt_image: QImage = self.convert_cv_qt(
+            cropped, self.camera_description.width, self.camera_description.height
         )
+        # w = self.camera_description.width
+        # h = self.camera_description.height
+        
+        # zoom = 2.0  # 2x zoom
+
+        # crop_w = int(w / zoom)
+        # crop_h = int(h / zoom)
+
+        # x = (w - crop_w) // 2
+        # y = (h - crop_h) // 2
+
+        # cropped = qt_image.copy(x, y, crop_w, crop_h)
+
+        # zoomed = cropped.scaled(
+        #     w,
+        #     h,
+        #     Qt.AspectRatioMode.IgnoreAspectRatio,
+        #     Qt.TransformationMode.FastTransformation,
+        # )
         
 
-        self.set_pixmap(QPixmap.fromImage(zoomed))
+        self.set_pixmap(QPixmap.fromImage(qt_image))
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -205,13 +218,16 @@ class VideoWidget(QWidget):
             raise ValueError('Somehow not color or grayscale image.')
         
         
+        
+        
+        
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
      
 
         
 
         
-        #qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
         #cropped = qt_image.copy(100, 50, 100, 100)
         #cropped = cropped.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
 
