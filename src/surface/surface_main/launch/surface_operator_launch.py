@@ -11,6 +11,7 @@ def generate_launch_description() -> LaunchDescription:
     gui_path = get_package_share_directory('gui')
     flight_control_path = get_package_share_directory('flight_control')
     transceiver_path = get_package_share_directory('transceiver')
+    measurement_path = get_package_share_directory('measurement')
 
     # Launches Gui
     gui_launch = IncludeLaunchDescription(
@@ -21,6 +22,13 @@ def generate_launch_description() -> LaunchDescription:
     flight_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [str(Path(flight_control_path) / 'launch' / 'flight_control_launch.py')]
+        ),
+    )
+
+    # Launches measurement
+    measurement_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [str(Path(measurement_path) / 'launch' / 'measurement_launch.py')]
         ),
     )
 
@@ -37,6 +45,7 @@ def generate_launch_description() -> LaunchDescription:
             gui_launch,
             flight_control_launch,
             transceiver_launch,
+            measurement_launch
         ]
     )
 

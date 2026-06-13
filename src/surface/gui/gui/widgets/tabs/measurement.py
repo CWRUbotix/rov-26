@@ -10,7 +10,6 @@ from gui.widgets.video_widget import (
     CameraDescription,
     CameraManager,
     CameraType,
-    ClickableLabel,
     SwitchableVideoWidget,
 )
 from rov_msgs.msg import Measurement
@@ -36,11 +35,12 @@ class MeasurementTab(QWidget):
 
         self.point_cloud_manager = CameraManager('manage_luxonis', CameraManage.Request.POINT_CLOUD)
         self.measurement_start_publisher = GUINode().create_publisher(Bool,
-                                        'measurement_start', qos_profile_default)
+                'measurement_start', qos_profile_default)
 
         self.signal.connect(self.measurement_callback)
 
-        GUINode().create_signal_subscription(Measurement, 'measurement_calculation', self.signal)
+        GUINode().create_signal_subscription(Measurement,
+                'measurement_calculation', self.signal)
 
         video_group = QGroupBox('Videos')
 
@@ -97,7 +97,6 @@ class MeasurementTab(QWidget):
                     ),
                 ),
                 'switch_rect_stream',
-                make_label=lambda: ClickableLabel(self.click_left_signal),
             ),
             Eye.RIGHT: SwitchableVideoWidget(
                 (
@@ -118,7 +117,6 @@ class MeasurementTab(QWidget):
                     ),
                 ),
                 'switch_rect_stream',
-                make_label=lambda: ClickableLabel(self.click_right_signal),
             ),
         }
 

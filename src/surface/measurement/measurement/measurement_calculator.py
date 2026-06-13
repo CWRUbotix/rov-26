@@ -1,8 +1,7 @@
 import numpy as np
 import open3d as o3d
 import rclpy
-from geometry_msgs import Point
-from gui.gui.widgets.video_widget import CameraManager
+from geometry_msgs.msg import Point
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import PointCloud2
@@ -25,7 +24,7 @@ class MeasurementCalculator(Node):
             Measurement, 'measurement_calculation', QoSPresetProfiles.DEFAULT.value
         )
 
-        self.point_cloud_manager = CameraManager('manage_luxonis', CameraManage.Request.POINT_CLOUD)
+        self.point_cloud_service = self.create_client(CameraManage, 'manage_luxonis')
 
     def point_cloud_callback(self, msg: PointCloud2) -> None:
         points = read_points(msg)
@@ -79,14 +78,17 @@ class MeasurementCalculator(Node):
             # possible to close the window to retrieve a different pointcloud
 
             # Turn off the point clouds
-            self.point_cloud_manager.set_cam_state(on=False)
+            request = CameraManage.Request(cam=CameraManage.Request.POINT_CLOUD, on=False)
+            response = self.point_cloud_service.call(request)
+            if not response or not response.success:
+                self.get_logger().warn('Failed to turn off point clouds')
 
             # Destroy the point cloud subscription
             self.point_cloud_subscriber.destroy()
             self.point_cloud_subscriber = None
 
-    def measurement_start_callback(self) -> None:
-        if self.point_cloud_subscriber is None:
+    def measurement_start_callback(self, value: Bool) -> None:
+        if value and self.point_cloud_subscriber is None:
             self.point_cloud_subscriber = self.create_subscription(
                 PointCloud2, 'rgbd/point_cloud',
                 self.point_cloud_callback, QoSPresetProfiles.DEFAULT.value

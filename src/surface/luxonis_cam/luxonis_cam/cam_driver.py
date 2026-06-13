@@ -13,8 +13,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
-from sensor_msgs import point_cloud2
-from sensor_msgs.msg import Image, PointCloud2, PointField
+from sensor_msgs.msg import Image, PointCloud2, PointField, _point_cloud2
 from std_msgs.msg import Header
 
 from rov_msgs.msg import Intrinsics
@@ -329,7 +328,7 @@ class PointFramePublishers:
             msg_point.extend(color[0:3])
             msg_points.append(msg_point)
 
-        point_cloud = point_cloud2.create_cloud(header, fields, msg_points)
+        point_cloud = _point_cloud2.create_cloud(header, fields, msg_points)
 
         return point_cloud
 
@@ -564,7 +563,7 @@ while True:
 
         self.get_logger().info('Pipeline deployed')
 
-    def create_toggle_queues(self, script: depthai.Script) -> None:
+    def create_toggle_queues(self, script: depthai.node.Script) -> None:
         # create toggle input queues
         self.toggle_queues = {}
         for cam_id, meta in self.stream_metas.items():
@@ -586,7 +585,9 @@ while True:
         )
         self.color_toggle_queue = script.inputs['color_toggle'].createInputQueue(maxSize=1)
 
-    def deploy_stereo_node(self, stereo_node: depthai.StereoDepth, script: depthai.Script) -> None:
+    def deploy_stereo_node(self,
+            stereo_node: depthai.node.StereoDepth,
+            script: depthai.node.Script) -> None:
         # Connecting script outputs to the stereo node
         script.outputs[self.left_stereo_script_topics.script_output_name].link(stereo_node.left)
         script.outputs[self.right_stereo_script_topics.script_output_name].link(stereo_node.right)
