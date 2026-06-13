@@ -16,6 +16,7 @@ from sensor_msgs.msg import Image
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
 from rov_msgs.srv import CameraManage
+import time
 
 # TODO: Ubuntu26+
 # Our own implementation of cv2.typing.MatLike until cv2.typing exists in a future ubuntu release
@@ -143,10 +144,12 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
+        
+        t0 = time.perf_counter()
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+        t1 = time.perf_counter()
         
-        
-        h, w = frame.shape[:2]
+        h, w = cv_image.shape[:2]
 
         zoom = 2.0
 
@@ -156,7 +159,11 @@ class VideoWidget(QWidget):
         x = (w - crop_w) // 2
         y = (h - crop_h) // 2
 
-        cropped = frame[y:y+crop_h, x:x+crop_w]
+        cropped = cv_image[y:y+crop_h, x:x+crop_w]
+        t2 = time.perf_counter()
+        
+        print("convert:", (t1 - t0)*1000, "ms")
+        print("crop:", (t2 - t1)*1000, "ms")
 
         qt_image: QImage = self.convert_cv_qt(
             cropped, self.camera_description.width, self.camera_description.height
@@ -228,6 +235,8 @@ class VideoWidget(QWidget):
 
         
         qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        
+        
         #cropped = qt_image.copy(100, 50, 100, 100)
         #cropped = cropped.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
 
