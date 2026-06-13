@@ -19,7 +19,7 @@ from std_msgs.msg import Header
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
 
-Matlike = NDArray[generic]
+Matlike = NDArray[np.uint8]
 
 # Stores the calibration
 LEFT_CAM_SOCKET = depthai.CameraBoardSocket.CAM_A
@@ -227,7 +227,7 @@ class FramePublishers:
         Image
             The ROS2 image message
         """
-        inverted_image = cv2.cvtColor(image.astype(int), cv2.COLOR_BGR2RGB)
+        inverted_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_msg: Image = self.bridge.cv2_to_imgmsg(inverted_image)
         img_msg.encoding = 'rgb8'
         img_msg.header.stamp = time
@@ -269,10 +269,13 @@ class PointFramePublishers:
         queue : depthai.MessageQueue
             queue to read from (single read then give up, won't block long)
         """
+        print("trying to publish a pointcloud")
         point_frame = queue.tryGet()
+        print("after try get")
 
         # Discard None (failed to get frame)
         if point_frame is None:
+            print("point frame was none :(")
             return
 
         # Type narrow to make mypy happy
@@ -283,6 +286,7 @@ class PointFramePublishers:
         time_msg = self.node.get_clock().now().to_msg()
 
         if point_frame is not None:
+            print("got a point cloud")
             point_msg = self.get_point_msg(point_frame, time_msg)
             if topic in self.publishers:
                 self.publishers[topic].publish(point_msg)
@@ -306,6 +310,7 @@ class PointFramePublishers:
         PointCloud2
             The ROS2 point cloud message
         """
+        print("attempting to convert a point cloud")
         points, colors = point_cloud_data.getPointsRGB()
 
         header = Header()
@@ -670,7 +675,6 @@ while True:
                     self.point_stream_metas[cam_id].topic, output_queue
                 )
                 self.get_logger().debug('Published a point cloud')
-                self.point_stream_metas[cam_id].enabled = False
 
     def update_toggles(self) -> None:
         enable_stereo = False
@@ -681,6 +685,7 @@ while True:
 
         for cam_id in POINT_STREAMS_THAT_NEED_STEREO:
             if self.point_stream_metas[cam_id].enabled:
+                print("turning on stereo for point cloud")
                 enable_stereo = True
                 break
 
