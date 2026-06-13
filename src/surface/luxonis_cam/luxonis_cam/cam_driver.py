@@ -517,7 +517,7 @@ while True:
 
         # Helps with photogrammetry and measurement
         stereo_node.setRectifyEdgeFillColor(0)
-        stereo_node.enableDistortionCorrection(arg0=True)
+        stereo_node.enableDistortionCorrection(True)
 
         script.outputs[self.color_script_topics.script_output_name].link(stereo_node.inputAlignTo)
 
@@ -541,7 +541,7 @@ while True:
         rgbd = self.pipeline.create(depthai.node.RGBD).build()
         script.outputs[self.stream_metas[CAM_IDS.LUX_DEPTH].script_topics.script_output_name].link(rgbd.inColor)
         script.outputs[self.color_script_topics.script_output_name].link(rgbd.inColor)
-        rgbd.pcl.link(script.inputs[self.stream_metas[CAM_IDS.POINT_CLOUD].script_topics.script_input_name])
+        rgbd.pcl.link(script.inputs[self.point_stream_metas[CAM_IDS.POINT_CLOUD].script_topics.script_input_name])
 
         self.get_logger().info('Deploying pipeline...')
 
