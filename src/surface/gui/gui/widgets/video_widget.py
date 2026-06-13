@@ -183,13 +183,35 @@ class VideoWidget(QWidget):
 
         else:
             raise ValueError('Somehow not color or grayscale image.')
-
+        
+        
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
-        #qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
-        cropped = qt_image.copy(100, 50, 100, 100)
-        cropped = cropped.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        w = qt_image.width()
+        h = qt_image.height()
 
-        return cropped
+        zoom = 2.0  # 2x zoom
+
+        crop_w = int(w / zoom)
+        crop_h = int(h / zoom)
+
+        x = (w - crop_w) // 2
+        y = (h - crop_h) // 2
+
+        cropped = qt_image.copy(x, y, crop_w, crop_h)
+
+        zoomed = cropped.scaled(
+            w,
+            h,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+        
+        #qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        #cropped = qt_image.copy(100, 50, 100, 100)
+        #cropped = cropped.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+
+        return zoomed
 
 
 class SwitchableVideoWidget(VideoWidget):
