@@ -7,13 +7,13 @@ import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
-from numpy import generic
 from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles
-from sensor_msgs.msg import Image, PointCloud2, PointField, _point_cloud2
+from sensor_msgs.msg import Image, PointCloud2, PointField
+from sensor_msgs_py.point_cloud2 import create_cloud
 from std_msgs.msg import Header
 
 from rov_msgs.msg import Intrinsics
@@ -333,7 +333,7 @@ class PointFramePublishers:
             msg_point.extend(color[0:3])
             msg_points.append(msg_point)
 
-        point_cloud = _point_cloud2.create_cloud(header, fields, msg_points)
+        point_cloud = create_cloud(header, fields, msg_points)
 
         return point_cloud
 
@@ -678,6 +678,7 @@ while True:
 
     def update_toggles(self) -> None:
         enable_stereo = False
+        enable_points = False
         for cam_id in STREAMS_THAT_NEED_STEREO:
             if self.stream_metas[cam_id].enabled:
                 enable_stereo = True
@@ -687,6 +688,7 @@ while True:
             if self.point_stream_metas[cam_id].enabled:
                 print("turning on stereo for point cloud")
                 enable_stereo = True
+                enable_points = True
                 break
 
         buf = depthai.Buffer()  # TODO: can we create this once and reuse?
@@ -694,15 +696,23 @@ while True:
         # Send whether the stereo is enabled using the buffer and it toggles the stereo
         self.left_stereo_toggle_queue.send(buf)
         self.right_stereo_toggle_queue.send(buf)
-        self.color_toggle_queue.send(buf)
+
+        buf_point = depthai.Buffer()
+        buf_point.setData(np.array([1 if enable_points else 0], dtype=np.uint8))
+        self.color_toggle_queue.send(buf_point)
+
+        buf_depth = depthai.Buffer()
+        buf_depth.setData(np.array([1 if enable_points
+                or self.stream_metas[CAM_IDS.LUX_DEPTH].enabled else 0], dtype=np.uint8))
 
         # Use the toggle queues to send whether each stream meta should be enabled
         for cam_id, toggle_queue in self.toggle_queues.items():
-            buf = depthai.Buffer()
-            buf.setData(
-                np.array([1 if self.stream_metas[cam_id].enabled else 0], dtype=np.uint8)
-            )
-            toggle_queue.send(buf)
+            if cam_id != CAM_IDS.LUX_DEPTH:
+                buf = depthai.Buffer()
+                buf.setData(
+                    np.array([1 if self.stream_metas[cam_id].enabled else 0], dtype=np.uint8)
+                )
+                toggle_queue.send(buf)
 
         for cam_id, point_toggle_queue in self.point_toggle_queues.items():
             buf = depthai.Buffer()

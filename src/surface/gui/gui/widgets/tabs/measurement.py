@@ -15,8 +15,10 @@ from gui.widgets.video_widget import (
 from rov_msgs.msg import Measurement
 from rov_msgs.srv import CameraManage
 
-FRAME_WIDTH = 816
-FRAME_HEIGHT = 510
+# FRAME_WIDTH = 816
+# FRAME_HEIGHT = 510
+FRAME_WIDTH = 721
+FRAME_HEIGHT = 541
 # FRAME_WIDTH = 1280
 # FRAME_HEIGHT = 800
 
@@ -46,7 +48,7 @@ class MeasurementTab(QWidget):
 
         videos = self.make_videos()
 
-        capture_btn = QPushButton()
+        capture_btn = QPushButton('Capture Point Cloud')
 
         capture_btn.clicked.connect(self.start_point_cloud_capture)
 
@@ -76,47 +78,69 @@ class MeasurementTab(QWidget):
 
         cam_layout = QHBoxLayout()
 
-        # TODO: RESET THIS TO ACTUAL LUXONIS CAM ONCE IT'S WORKING AGAIN
+        # self.eye_widgets = {
+        #     Eye.LEFT: SwitchableVideoWidget(
+        #         (
+        #             CameraDescription(
+        #                 CameraType.DEPTH,
+        #                 'rect_left/image_raw',
+        #                 'Stream stopped',
+        #                 FRAME_WIDTH,
+        #                 FRAME_HEIGHT,
+        #             ),
+        #             CameraDescription(
+        #                 CameraType.DEPTH,
+        #                 'rect_left/image_raw',
+        #                 'Dual Left Eye',
+        #                 FRAME_WIDTH,
+        #                 FRAME_HEIGHT,
+        #                 CameraManager('manage_luxonis', CameraManage.Request.LUX_LEFT_RECT),
+        #             ),
+        #         ),
+        #         'switch_rect_stream',
+        #     ),
+        #     Eye.RIGHT: SwitchableVideoWidget(
+        #         (
+        #             CameraDescription(
+        #                 CameraType.DEPTH,
+        #                 'rect_right/image_raw',
+        #                 'Stream stopped',
+        #                 FRAME_WIDTH,
+        #                 FRAME_HEIGHT,
+        #             ),
+        #             CameraDescription(
+        #                 CameraType.DEPTH,
+        #                 'rect_right/image_raw',
+        #                 'Dual Right Eye',
+        #                 FRAME_WIDTH,
+        #                 FRAME_HEIGHT,
+        #                 CameraManager('manage_luxonis', CameraManage.Request.LUX_RIGHT_RECT),
+        #             ),
+        #         ),
+        #         'switch_rect_stream',
+        #     ),
+        # }
+
         self.eye_widgets = {
             Eye.LEFT: SwitchableVideoWidget(
                 (
                     CameraDescription(
                         CameraType.DEPTH,
-                        'rect_left/image_raw',
+                        'lux_raw/image_raw',
                         'Stream stopped',
                         FRAME_WIDTH,
                         FRAME_HEIGHT,
                     ),
                     CameraDescription(
                         CameraType.DEPTH,
-                        'rect_left/image_raw',
+                        'lux_raw/image_raw',
                         'Dual Left Eye',
                         FRAME_WIDTH,
                         FRAME_HEIGHT,
-                        CameraManager('manage_luxonis', CameraManage.Request.LUX_LEFT_RECT),
+                        CameraManager('manage_luxonis', CameraManage.Request.LUX_LEFT),
                     ),
                 ),
-                'switch_rect_stream',
-            ),
-            Eye.RIGHT: SwitchableVideoWidget(
-                (
-                    CameraDescription(
-                        CameraType.DEPTH,
-                        'rect_right/image_raw',
-                        'Stream stopped',
-                        FRAME_WIDTH,
-                        FRAME_HEIGHT,
-                    ),
-                    CameraDescription(
-                        CameraType.DEPTH,
-                        'rect_right/image_raw',
-                        'Dual Right Eye',
-                        FRAME_WIDTH,
-                        FRAME_HEIGHT,
-                        CameraManager('manage_luxonis', CameraManage.Request.LUX_RIGHT_RECT),
-                    ),
-                ),
-                'switch_rect_stream',
+                'switch_measure_stream',
             ),
         }
 
