@@ -151,13 +151,13 @@ class VideoWidget(QWidget):
         
         h, w = cv_image.shape[:2]
 
-        zoom = 2.0
+        zoom = 1.5
 
-        crop_w = int(w / zoom)
         crop_h = int(h / zoom)
+        crop_w = crop_h
 
         x = (w - crop_w) // 2
-        y = (h - crop_h) // 2
+        y = (h - crop_h) // 2 - 60
 
         cropped = cv_image[y:y+crop_h, x:x+crop_w]
         t2 = time.perf_counter()
