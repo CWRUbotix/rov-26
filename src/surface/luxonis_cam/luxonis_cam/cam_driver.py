@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from tokenize import String
 
 import cv2
 import depthai
@@ -14,8 +13,8 @@ from rclpy.node import Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles, qos_profile_system_default
 from sensor_msgs.msg import Image
-from rov_msgs.msg import CropCam
-from rov_msgs.msg import Intrinsics
+
+from rov_msgs.msg import CropCam, Intrinsics
 from rov_msgs.srv import CameraManage
 
 Matlike = NDArray[np.uint8]
@@ -30,6 +29,7 @@ MISSED_SENDS_RESET_THRESHOLD = 5
 # FRAME_HEIGHT = 800
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 400
+
 
 # ROS topics it streams to
 class StreamTopic(StrEnum):
@@ -120,7 +120,6 @@ class FramePublishers:
         self.node = node
         self.publishers = {topic: self.make_frame_publisher(topic) for topic in StreamTopic}
         self.bridge = CvBridge()
-        
 
     def make_frame_publisher(self, topic: StreamTopic) -> Publisher:
         """
@@ -209,8 +208,7 @@ class LuxonisCamDriverNode(Node):
         self.subscription = self.create_subscription(
             CropCam, TOPIC_CROP_CAM, self.crop_callback, qos_profile_system_default
         )
-        print("*********does this run???")
-    
+        print('*********does this run???')
 
         self.stream_metas = {
             CAM_IDS.LUX_LEFT: StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
@@ -264,21 +262,21 @@ class LuxonisCamDriverNode(Node):
         self.get_logger().info('Pipeline created')
 
         self.missed_sends = 0
+
     def listener_callback(self, msg):
-        print("********************")
+        print('********************')
         print(msg.data)
-        
-    def crop_callback(self, message: CropCam ) -> None:
-        print("subscription!!!!!!!!!!!!!")
+
+    def crop_callback(self, message: CropCam) -> None:
+        print('subscription!!!!!!!!!!!!!')
         is_cropped = message.is_cropped
-        
+
         if is_cropped:
-            print("should be cropped")
+            print('should be cropped')
             # add what we need to crop here
         else:
-            print("Should not be cropped")
+            print('Should not be cropped')
             # uncrop here
-    
 
     def cam_manage_callback(
         self, request: CameraManage.Request, response: CameraManage.Response
@@ -333,10 +331,11 @@ class LuxonisCamDriverNode(Node):
         ):
             input_name = meta.script_topics.script_input_name
             node.requestOutput(
-                #I think we can just change frame width and frame height
-                #If this doesn't work, we can try size=(width, height),
+                # I think we can just change frame width and frame height
+                # If this doesn't work, we can try size=(width, height),
                 # not sure what size we need to make it
-                (FRAME_WIDTH, FRAME_HEIGHT), type=depthai.ImgFrame.Type.RGB888p
+                (FRAME_WIDTH, FRAME_HEIGHT),
+                type=depthai.ImgFrame.Type.RGB888p,
             ).link(script.inputs[input_name])
             script.inputs[input_name].setBlocking(False)
             script.inputs[input_name].setMaxSize(1)
@@ -419,7 +418,6 @@ while True:
         self.right_stereo_toggle_queue = script.inputs['right_stereo_toggle_in'].createInputQueue()
 
         self.get_logger().info('Deploying pipeline...')
-        
 
         # Deploy pipeline to device
         while True:

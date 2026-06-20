@@ -1,9 +1,9 @@
-from tokenize import String
-
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTabWidget, QVBoxLayout, QWidget
+from rclpy.qos import qos_profile_system_default
 
 from gui.app import App
+from gui.gui_node import GUINode
 from gui.widgets.float_comm import FloatComm
 from gui.widgets.flood_warning import FloodWarning
 from gui.widgets.heartbeat import HeartbeatWidget
@@ -14,24 +14,25 @@ from gui.widgets.tabs.shipwreck import ShipwreckTab
 from gui.widgets.temperature import TemperatureSensor
 from gui.widgets.timer import InteractiveTimer
 from rov_msgs.msg import CropCam
-from gui.gui_node import GUINode
-from rclpy.qos import qos_profile_system_default
 
 SHIPWRECK_TEXT = 'Shipwreck'
 
 TOPIC_CROP_CAM = 'cropCam'
+
+
 class OperatorApp(App):
     changed_tabs = pyqtSignal(int)
     signal = pyqtSignal(CropCam)
-    
 
     def __init__(self) -> None:
         super().__init__('operator_gui_node')
         self.crop = False
         self.signal.connect(self.refresh)
-        
+
         GUINode().create_signal_subscription(CropCam, TOPIC_CROP_CAM, self.signal)
-        self.publisher =GUINode().create_publisher(CropCam, TOPIC_CROP_CAM, qos_profile_system_default)
+        self.publisher = GUINode().create_publisher(
+            CropCam, TOPIC_CROP_CAM, qos_profile_system_default
+        )
 
         self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
         # Main tab
@@ -68,7 +69,7 @@ class OperatorApp(App):
         self.shipwreck_tab = ShipwreckTab()
         self.tabs.addTab(self.shipwreck_tab, SHIPWRECK_TEXT)
         self.crop_button = QPushButton()
-        self.crop_button.setText("Crop Camera Output")
+        self.crop_button.setText('Crop Camera Output')
         root_layout.addWidget(self.crop_button)
         self.crop_button.clicked.connect(self.on_button_clicked)
         self.tabs.currentChanged.connect(self.changed_tabs)
@@ -81,36 +82,31 @@ class OperatorApp(App):
         if self.tabs.tabText(index) == SHIPWRECK_TEXT:
             # Allow keyboard events
             self.shipwreck_tab.setFocus(Qt.FocusReason.TabFocusReason)
-       #check is refresh runs     
+
+    # check is refresh runs
     @pyqtSlot(CropCam)
     def refresh(self, msg: CropCam) -> None:
         if msg.is_cropped:
-            print("In refresh crop is true")
+            print('In refresh crop is true')
             self.crop = True
         else:
-            print("In refresh crop is false")
+            print('In refresh crop is false')
             self.crop = False
-        
-        
-    
+
     def on_button_clicked(self):
-        print("**************************button clicked**********************")
+        print('**************************button clicked**********************')
         if self.crop:
             payload = CropCam(is_cropped=False)
             self.publisher.publish(payload)
             self.crop = False
-            self.crop_button.setText("Crop Camera Output")
-            print("crop should be false now")
+            self.crop_button.setText('Crop Camera Output')
+            print('crop should be false now')
         else:
             payload = CropCam(is_cropped=True)
             self.publisher.publish(payload)
             self.crop = True
-            self.crop_button.setText("Enlarge Camera Output")
-            print("crop should be true now")
-        
-        
-        
-
+            self.crop_button.setText('Enlarge Camera Output')
+            print('crop should be true now')
 
 
 def run_gui_operator() -> None:

@@ -16,7 +16,6 @@ from sensor_msgs.msg import Image
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
 from rov_msgs.srv import CameraManage
-import time
 
 # TODO: Ubuntu26+
 # Our own implementation of cv2.typing.MatLike until cv2.typing exists in a future ubuntu release
@@ -32,6 +31,7 @@ HEIGHT = 541
 
 COLOR = 3
 GREY_SCALE = 2
+
 
 class CameraType(IntEnum):
     """
@@ -140,24 +140,22 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
-        
-        #t0 = time.perf_counter()
+        # t0 = time.perf_counter()
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-        #t1 = time.perf_counter()
-        
-        #h, w = cv_image.shape[:2]
+        # t1 = time.perf_counter()
+
+        # h, w = cv_image.shape[:2]
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
-            )
+        )
         if self.camera_description.is_crop:
             w = self.camera_description.width
             h = self.camera_description.height
-        
+
             zoom = 1.5  # 2x zoom
-        
+
             crop_h = int(h / zoom)
             crop_w = crop_h
-        
 
             x = (w - crop_w) // 2
             y = (h - crop_h) // 2 - 60
@@ -170,15 +168,12 @@ class VideoWidget(QWidget):
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.FastTransformation,
             )
-        
 
             self.set_pixmap(QPixmap.fromImage(zoomed))
-            
+
         else:
-            
             print(f'in else ${self.camera_description.label}')
             self.set_pixmap(QPixmap.fromImage(qt_image))
-            
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -212,7 +207,7 @@ class VideoWidget(QWidget):
 
         else:
             raise ValueError('Somehow not color or grayscale image.')
-        
+
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
         return qt_image
 
