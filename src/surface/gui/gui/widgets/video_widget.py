@@ -145,51 +145,49 @@ class VideoWidget(QWidget):
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         
-        t0 = time.perf_counter()
+        #t0 = time.perf_counter()
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-        t1 = time.perf_counter()
+        #t1 = time.perf_counter()
         
-        h, w = cv_image.shape[:2]
+        #h, w = cv_image.shape[:2]
 
-        zoom = 1.5
+        zoom = 2.0
 
-        crop_h = int(h / zoom)
-        crop_w = crop_h
+        #crop_w = int(w / zoom)
+        #crop_h = int(h / zoom)
 
-        x = (w - crop_w) // 2
-        y = (h - crop_h) // 2 - 60
+        #x = (w - crop_w) // 2
+        #y = (h - crop_h) // 2
 
-        cropped = cv_image[y:y+crop_h, x:x+crop_w]
-        t2 = time.perf_counter()
+        #cropped = cv_image[y:y+crop_h, x:x+crop_w]
+        #t2 = time.perf_counter()
         
-        print("convert:", (t1 - t0)*1000, "ms")
-        print("crop:", (t2 - t1)*1000, "ms")
 
         qt_image: QImage = self.convert_cv_qt(
-            cropped, self.camera_description.width, self.camera_description.height
+            cv_image, self.camera_description.width, self.camera_description.height
         )
-        # w = self.camera_description.width
-        # h = self.camera_description.height
+        w = self.camera_description.width
+        h = self.camera_description.height
         
-        # zoom = 2.0  # 2x zoom
+        zoom = 1.5  # 2x zoom
 
-        # crop_w = int(w / zoom)
-        # crop_h = int(h / zoom)
+        crop_w = int(w / zoom)
+        crop_h = int(h / zoom)
 
-        # x = (w - crop_w) // 2
-        # y = (h - crop_h) // 2
+        x = (w - crop_w) // 2
+        y = (h - crop_h) // 2
 
-        # cropped = qt_image.copy(x, y, crop_w, crop_h)
+        cropped = qt_image.copy(x, y, crop_w, crop_h)
 
-        # zoomed = cropped.scaled(
-        #     w,
-        #     h,
-        #     Qt.AspectRatioMode.IgnoreAspectRatio,
-        #     Qt.TransformationMode.FastTransformation,
-        # )
+        zoomed = cropped.scaled(
+             w,
+             h,
+             Qt.AspectRatioMode.IgnoreAspectRatio,
+             Qt.TransformationMode.FastTransformation,
+        )
         
 
-        self.set_pixmap(QPixmap.fromImage(qt_image))
+        self.set_pixmap(QPixmap.fromImage(zoomed))
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
