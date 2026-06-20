@@ -31,10 +31,6 @@ MISSED_SENDS_RESET_THRESHOLD = 5
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 400
 
-# FRAME_WIDTH = 100
-# FRAME_HEIGHT = 100
-
-
 # ROS topics it streams to
 class StreamTopic(StrEnum):
     LUX_RAW = 'lux_raw/image_raw'
