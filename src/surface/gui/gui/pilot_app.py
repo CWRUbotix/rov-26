@@ -185,7 +185,7 @@ class PilotApp(App):
                         False
                     ),
                     
-                      CameraDescription(
+                    CameraDescription(
                         mono_cam_type,
                         CAM1_TOPIC,
                         'Cropped Down Camera',

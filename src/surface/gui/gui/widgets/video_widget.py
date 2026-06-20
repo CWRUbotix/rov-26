@@ -26,12 +26,12 @@ import time
 # MatLike = NDArray[np.integer[Any] | np.floating[Any]]
 MatLike = NDArray[np.generic]
 
-# WIDTH = 721
-# HEIGHT = 541
+WIDTH = 721
+HEIGHT = 541
 # 1 Pixel larger than actual pixel dimensions
 
-WIDTH = 100
-HEIGHT = 100
+# WIDTH = 100
+# HEIGHT = 100
 
 
 COLOR = 3
@@ -155,6 +155,7 @@ class VideoWidget(QWidget):
             cv_image, self.camera_description.width, self.camera_description.height
             )
         if self.camera_description.is_crop:
+            print('is cropped ${self.camera_description.label}')
             w = self.camera_description.width
             h = self.camera_description.height
         
@@ -180,6 +181,8 @@ class VideoWidget(QWidget):
             self.set_pixmap(QPixmap.fromImage(zoomed))
             
         else:
+            
+            print(f'in else ${self.camera_description.label}')
             self.set_pixmap(QPixmap.fromImage(qt_image))
             
 
@@ -226,7 +229,7 @@ class VideoWidget(QWidget):
         
 
         
-        qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+        # qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
         
         
         #cropped = qt_image.copy(100, 50, 100, 100)
