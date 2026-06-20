@@ -92,6 +92,7 @@ class CameraDescription(NamedTuple):
     width: int = WIDTH
     height: int = HEIGHT
     manager: CameraManager | None = None
+    is_crop: bool = False
 
 
 class ClickableLabel(QLabel):
@@ -150,45 +151,37 @@ class VideoWidget(QWidget):
         #t1 = time.perf_counter()
         
         #h, w = cv_image.shape[:2]
-
-        zoom = 2.0
-
-        #crop_w = int(w / zoom)
-        #crop_h = int(h / zoom)
-
-        #x = (w - crop_w) // 2
-        #y = (h - crop_h) // 2
-
-        #cropped = cv_image[y:y+crop_h, x:x+crop_w]
-        #t2 = time.perf_counter()
-        
-
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
-        )
-        w = self.camera_description.width
-        h = self.camera_description.height
+            )
+        if self.camera_description.is_crop:
+            w = self.camera_description.width
+            h = self.camera_description.height
         
-        zoom = 1.5  # 2x zoom
+            zoom = 1.5  # 2x zoom
         
-        crop_h = int(h / zoom)
-        crop_w = crop_h
-        
-
-        x = (w - crop_w) // 2
-        y = (h - crop_h) // 2 - 60
-
-        cropped = qt_image.copy(x, y, crop_w, crop_h)
-
-        zoomed = cropped.scaled(
-             w,
-             h,
-             Qt.AspectRatioMode.IgnoreAspectRatio,
-             Qt.TransformationMode.FastTransformation,
-        )
+            crop_h = int(h / zoom)
+            crop_w = crop_h
         
 
-        self.set_pixmap(QPixmap.fromImage(zoomed))
+            x = (w - crop_w) // 2
+            y = (h - crop_h) // 2 - 60
+
+            cropped = qt_image.copy(x, y, crop_w, crop_h)
+
+            zoomed = cropped.scaled(
+                w,
+                h,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+        
+
+            self.set_pixmap(QPixmap.fromImage(zoomed))
+            
+        else:
+            self.set_pixmap(QPixmap.fromImage(qt_image))
+            
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()

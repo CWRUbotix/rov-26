@@ -181,7 +181,19 @@ class PilotApp(App):
                         frame_width,
                         frame_height,
                         CameraManager('manage_flir', CameraManage.Request.FLIR_DOWN),
+                        is_crop= False
                     ),
+                    
+                      CameraDescription(
+                        mono_cam_type,
+                        CAM1_TOPIC,
+                        'Down Camera',
+                        frame_width,
+                        frame_height,
+                        CameraManager('manage_flir', CameraManage.Request.FLIR_DOWN),
+                        is_crop= True
+                    ),
+                      
                     CameraDescription(
                         CameraType.DEPTH,
                         'lux_raw/image_raw',
@@ -189,6 +201,7 @@ class PilotApp(App):
                         frame_width,
                         frame_height,
                         CameraManager('manage_luxonis', CameraManage.Request.LUX_LEFT),
+                        is_crop= False
                     ),
                     CameraDescription(
                         CameraType.DEPTH,
@@ -197,6 +210,7 @@ class PilotApp(App):
                         frame_width,
                         frame_height,
                         CameraManager('manage_luxonis', CameraManage.Request.LUX_RIGHT),
+                        is_crop= False
                     ),
                 ),
                 'switch_right_stream',
