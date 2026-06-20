@@ -170,12 +170,13 @@ class VideoWidget(QWidget):
         h = self.camera_description.height
         
         zoom = 1.5  # 2x zoom
-
-        crop_w = int(w / zoom)
+        
         crop_h = int(h / zoom)
+        crop_w = crop_h
+        
 
         x = (w - crop_w) // 2
-        y = (h - crop_h) // 2
+        y = (h - crop_h) // 2 - 60
 
         cropped = qt_image.copy(x, y, crop_w, crop_h)
 
