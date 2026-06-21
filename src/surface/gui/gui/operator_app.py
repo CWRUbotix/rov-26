@@ -11,6 +11,7 @@ from gui.widgets.tabs.general_debug_tab import GeneralDebugTab
 from gui.widgets.tabs.shipwreck import ShipwreckTab
 from gui.widgets.temperature import TemperatureSensor
 from gui.widgets.timer import InteractiveTimer
+from gui.widgets.tabs.measurement import MeasurementTab
 
 SHIPWRECK_TEXT = 'Shipwreck'
 
@@ -54,6 +55,7 @@ class OperatorApp(App):
         self.tabs = QTabWidget()
         self.tabs.addTab(main_tab, 'Main')
         self.tabs.addTab(GeneralDebugTab(), 'General Debug')
+        self.tabs.addTab(MeasurementTab(), 'Measurement')
         self.shipwreck_tab = ShipwreckTab()
         self.tabs.addTab(self.shipwreck_tab, SHIPWRECK_TEXT)
         self.tabs.currentChanged.connect(self.changed_tabs)

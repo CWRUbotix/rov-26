@@ -24,6 +24,6 @@ setup(
     license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': ['luxonis_cam_driver = luxonis_cam.cam_driver:main'],
+        'console_scripts': ['luxonis_cam_driver = luxonis_cam.cam_driver:main', 'measurement_cam_driver = luxonis_cam.measurement_cam:main'],
     },
 )
