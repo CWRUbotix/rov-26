@@ -1,9 +1,7 @@
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtWidgets import QHBoxLayout, QPushButton, QTabWidget, QVBoxLayout, QWidget
-from rclpy.qos import qos_profile_system_default
+from PyQt6.QtWidgets import QHBoxLayout, QTabWidget, QVBoxLayout, QWidget
 
 from gui.app import App
-from gui.gui_node import GUINode
 from gui.widgets.float_comm import FloatComm
 from gui.widgets.flood_warning import FloodWarning
 from gui.widgets.heartbeat import HeartbeatWidget
@@ -15,7 +13,6 @@ from gui.widgets.temperature import TemperatureSensor
 from gui.widgets.timer import InteractiveTimer
 
 SHIPWRECK_TEXT = 'Shipwreck'
-
 
 
 class OperatorApp(App):
@@ -69,6 +66,7 @@ class OperatorApp(App):
         if self.tabs.tabText(index) == SHIPWRECK_TEXT:
             # Allow keyboard events
             self.shipwreck_tab.setFocus(Qt.FocusReason.TabFocusReason)
+
 
 def run_gui_operator() -> None:
     OperatorApp().run_gui()

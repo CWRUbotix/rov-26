@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
-from rclpy.qos import QoSPresetProfiles, qos_profile_system_default
+from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import Image
 
 from rov_msgs.msg import Intrinsics
@@ -198,8 +198,6 @@ STREAMS_THAT_NEED_STEREO = [
     CAM_IDS.LUX_DISPARITY,
     CAM_IDS.LUX_DEPTH,
 ]
-
-
 
 
 class LuxonisCamDriverNode(Node):
