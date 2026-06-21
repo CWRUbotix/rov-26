@@ -165,7 +165,7 @@ class VideoWidget(QWidget):
         """Convert from an opencv image to QPixmap."""
         if self.camera_description.type == CameraType.ETHERNET:
             # Switches ethernet's color profile from BayerBGR to BGR
-            cv_img = cv2.cvtColor(cv_img.astype(int), cv2.COLOR_BAYER_BGGR2BGR)
+            cv_img = cv2.cvtColor(cv_img, cv2.COLOR_BAYER_BGGR2BGR)
 
         # Color image
         if len(cv_img.shape) == COLOR:
@@ -298,7 +298,7 @@ class PauseableVideoWidget(VideoWidget):
             cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
             # Run model on cv_image
             model = YOLO(str(
-                Path(get_package_share_directory('gui')) / 'best.pt'
+                Path('~/rov-26/src/surface/gui/gui/best.pt')
             ))
 
             results = model(cv_image)
