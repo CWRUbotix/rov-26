@@ -207,6 +207,8 @@ class VideoWidget(QWidget):
             raise ValueError('Somehow not color or grayscale image.')
 
         qt_image = QImage(cv_img.data.tobytes(), w, h, bytes_per_line, img_format)
+        qt_image = qt_image.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio)
+
         return qt_image
 
 
