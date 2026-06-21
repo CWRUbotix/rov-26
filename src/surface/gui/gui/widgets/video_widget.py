@@ -29,7 +29,6 @@ WIDTH = 721
 HEIGHT = 541
 # 1 Pixel larger than actual pixel dimensions
 
-
 COLOR = 3
 GREY_SCALE = 2
 
@@ -79,6 +78,8 @@ class CameraDescription(NamedTuple):
         The height of the Camera Stream, by default HEIGHT constant.
     manager: CameraManager | None
         Used for toggling cam streams in SwitchableVideoWidgets
+    is_crop: bool
+        Used for cropping the down cam and not the other cams
 
     """
 
@@ -88,6 +89,7 @@ class CameraDescription(NamedTuple):
     width: int = WIDTH
     height: int = HEIGHT
     manager: CameraManager | None = None
+    is_crop: bool = False
 
 
 class ClickableLabel(QLabel):
@@ -141,12 +143,35 @@ class VideoWidget(QWidget):
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
         )
+        # for cropped down cam
+        if self.camera_description.is_crop:
+            w = self.camera_description.width
+            h = self.camera_description.height
 
-        self.set_pixmap(QPixmap.fromImage(qt_image))
+            zoom = 1.5
+
+            crop_h = int(h / zoom)
+            crop_w = crop_h
+
+            x = (w - crop_w) // 2
+            y = (h - crop_h) // 2 - 60
+
+            cropped = qt_image.copy(x, y, crop_w, crop_h)
+
+            zoomed = cropped.scaled(
+                w,
+                h,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+
+            self.set_pixmap(QPixmap.fromImage(zoomed))
+
+        else:
+            self.set_pixmap(QPixmap.fromImage(qt_image))
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
