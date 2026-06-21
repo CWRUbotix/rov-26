@@ -20,7 +20,6 @@ class OperatorApp(App):
 
     def __init__(self) -> None:
         super().__init__('operator_gui_node')
-        self.signal.connect(self.refresh)
 
         self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
         # Main tab
