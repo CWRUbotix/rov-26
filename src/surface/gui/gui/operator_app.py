@@ -24,7 +24,6 @@ class OperatorApp(App):
         super().__init__('operator_gui_node')
 
         self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
-
         # Main tab
         main_tab = QWidget()
         main_layout = QHBoxLayout()

@@ -12,13 +12,6 @@ NAMESPACE = 'pi'
 
 
 def generate_launch_description() -> LaunchDescription:
-    # Manipulator Controller
-    manip_path = get_package_share_directory('manipulators')
-
-    manip_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([str(Path(manip_path) / 'launch' / 'manip_launch.py')])
-    )
-
     # Pi Info
     pi_info_path = get_package_share_directory('pi_info')
 
@@ -38,7 +31,6 @@ def generate_launch_description() -> LaunchDescription:
     namespace_launch = GroupAction(
         actions=[
             PushRosNamespace(NAMESPACE),
-            manip_launch,
             flood_detection_launch,
             pi_info_launch,
         ]
