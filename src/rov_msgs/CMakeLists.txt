@@ -40,7 +40,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FloatSerial.msg"
   "msg/FloatSingle.msg"
   "msg/Intrinsics.msg"
-  "msg/CropCam.msg"
   "srv/AutonomousFlight.srv"
   "srv/MissionTimerSet.srv"
   "srv/CameraManage.srv"

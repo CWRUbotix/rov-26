@@ -14,7 +14,7 @@ from rclpy.publisher import Publisher
 from rclpy.qos import QoSPresetProfiles, qos_profile_system_default
 from sensor_msgs.msg import Image
 
-from rov_msgs.msg import CropCam, Intrinsics
+from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
 
 Matlike = NDArray[np.uint8]
@@ -199,16 +199,12 @@ STREAMS_THAT_NEED_STEREO = [
     CAM_IDS.LUX_DEPTH,
 ]
 
-TOPIC_CROP_CAM = 'cropCam'
+
 
 
 class LuxonisCamDriverNode(Node):
     def __init__(self) -> None:
         super().__init__('luxonis_cam_driver', parameter_overrides=[])
-        self.subscription = self.create_subscription(
-            CropCam, TOPIC_CROP_CAM, self.crop_callback, qos_profile_system_default
-        )
-        print('*********does this run???')
 
         self.stream_metas = {
             CAM_IDS.LUX_LEFT: StreamMeta.of('left', StreamTopic.LUX_RAW, enabled=False),
@@ -262,21 +258,6 @@ class LuxonisCamDriverNode(Node):
         self.get_logger().info('Pipeline created')
 
         self.missed_sends = 0
-
-    def listener_callback(self, msg):
-        print('********************')
-        print(msg.data)
-
-    def crop_callback(self, message: CropCam) -> None:
-        print('subscription!!!!!!!!!!!!!')
-        is_cropped = message.is_cropped
-
-        if is_cropped:
-            print('should be cropped')
-            # add what we need to crop here
-        else:
-            print('Should not be cropped')
-            # uncrop here
 
     def cam_manage_callback(
         self, request: CameraManage.Request, response: CameraManage.Response

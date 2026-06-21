@@ -78,6 +78,8 @@ class CameraDescription(NamedTuple):
         The height of the Camera Stream, by default HEIGHT constant.
     manager: CameraManager | None
         Used for toggling cam streams in SwitchableVideoWidgets
+    is_crop: bool
+        Used for cropping the down cam and not the other cams
 
     """
 
@@ -140,19 +142,16 @@ class VideoWidget(QWidget):
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
-        # t0 = time.perf_counter()
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-        # t1 = time.perf_counter()
-
-        # h, w = cv_image.shape[:2]
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
         )
+        # for cropped down cam
         if self.camera_description.is_crop:
             w = self.camera_description.width
             h = self.camera_description.height
 
-            zoom = 1.5  # 2x zoom
+            zoom = 1.5
 
             crop_h = int(h / zoom)
             crop_w = crop_h
@@ -172,7 +171,6 @@ class VideoWidget(QWidget):
             self.set_pixmap(QPixmap.fromImage(zoomed))
 
         else:
-            print(f'in else ${self.camera_description.label}')
             self.set_pixmap(QPixmap.fromImage(qt_image))
 
     def get_pixmap(self) -> QPixmap:
