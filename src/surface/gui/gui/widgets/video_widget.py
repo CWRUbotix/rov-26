@@ -296,17 +296,17 @@ class PauseableVideoWidget(VideoWidget):
         elif self.is_paused and not self.ran_model:
             #cv_image = super().get_cv_image(frame)
             cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+
+            if self.camera_description.type == CameraType.ETHERNET:
+                # Switches ethernet's color profile from BayerBGR to BGR
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BAYER_BGGR2BGR)
             # Run model on cv_image
             model = YOLO(str(
-                Path('~/rov-26/src/surface/gui/gui/best.pt')
+                Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')
             ))
 
             results = model(cv_image)
             results[0].show()
-            qt_image: QImage = self.convert_cv_qt(
-                cv_image, self.camera_description.width, self.camera_description.height
-            )
-            self.set_pixmap(QPixmap.fromImage(qt_image))
             self.ran_model = True
 
     def toggle(self) -> None:
