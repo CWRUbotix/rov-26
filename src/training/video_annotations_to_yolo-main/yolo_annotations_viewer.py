@@ -2,17 +2,20 @@
 # https://github.com/omrode1/YOLO-Annotation-Viewer
 
 import os
+from collections import Counter
+
 import cv2
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from collections import Counter
+
 
 def load_classes(folder_path):
     """Load the class names from the classes.txt file."""
     classes_file = os.path.join(folder_path, 'classes.txt')
-    with open(classes_file, 'r') as f:
+    with open(classes_file) as f:
         classes = f.read().splitlines()
     return classes
+
 
 def load_annotations(folder_path):
     """Load YOLO annotations from the folder."""
@@ -21,9 +24,10 @@ def load_annotations(folder_path):
         if filename.endswith('.txt') and filename != 'classes.txt':  # Ignore classes.txt
             img_id = os.path.splitext(filename)[0]
             filepath = os.path.join(folder_path, filename)
-            with open(filepath, 'r') as f:
-                annotations[img_id] = [line.strip().split() for line in f.readlines()]
+            with open(filepath) as f:
+                annotations[img_id] = [line.strip().split() for line in f]
     return annotations
+
 
 def load_image(folder_path, image_id):
     """Load an image from the image folder."""
@@ -34,6 +38,7 @@ def load_image(folder_path, image_id):
             img = cv2.resize(img, (1620, 1080), img)
             return img
     return None
+
 
 def plot_annotations(ax, image, annotation_data, classes, colors):
     """Plot image with YOLO bounding boxes using Matplotlib."""
@@ -55,14 +60,21 @@ def plot_annotations(ax, image, annotation_data, classes, colors):
         bbox_height = int(height * img_height)
 
         # Draw the rectangle
-        rect = Rectangle((x1, y1), bbox_width, bbox_height, linewidth=2,
-                         edgecolor=colors[class_id], facecolor='none')
+        rect = Rectangle(
+            (x1, y1),
+            bbox_width,
+            bbox_height,
+            linewidth=2,
+            edgecolor=colors[class_id],
+            facecolor='none',
+        )
         ax.add_patch(rect)
 
         # Add class label
         ax.text(x1, y1 - 5, classes[class_id], color=colors[class_id], fontsize=12, weight='bold')
 
     plt.draw()  # Update the plot without blocking
+
 
 def count_class_instances(annotations, classes):
     """Count the instances of each class."""
@@ -72,6 +84,7 @@ def count_class_instances(annotations, classes):
             class_id = int(ann[0])
             class_counts[classes[class_id]] += 1
     return class_counts
+
 
 def plot_class_distribution(class_counts):
     """Plot a bar graph for class distribution."""
@@ -84,6 +97,7 @@ def plot_class_distribution(class_counts):
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
+
 
 def main(annotations_path: str, imgs_path: str):
     # Folder path containing images, annotations, and classes.txt
@@ -118,7 +132,7 @@ def main(annotations_path: str, imgs_path: str):
             annotation_data = annotations.get(img_id, [])
             plot_annotations(ax, image, annotation_data, classes, class_colors)
         else:
-            print(f"Image {img_id} not found.")
+            print(f'Image {img_id} not found.')
 
     # Display the first image
     display_image_with_annotations()
@@ -138,7 +152,8 @@ def main(annotations_path: str, imgs_path: str):
     # Display the figure
     plt.show()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main('output/labels', 'output/images')
     # main('dataset/labels/train', 'dataset/images/train')
     # main('output/darknet', 'dataset/images/test')

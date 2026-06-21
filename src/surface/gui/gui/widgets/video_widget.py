@@ -6,7 +6,6 @@ from typing import NamedTuple
 
 import cv2
 import numpy as np
-from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from numpy.typing import NDArray
 from PyQt6.QtCore import Qt, pyqtBoundSignal, pyqtSignal, pyqtSlot
@@ -319,16 +318,14 @@ class PauseableVideoWidget(VideoWidget):
         if not self.is_paused:
             super().handle_frame(frame)
         elif self.is_paused and not self.ran_model:
-            #cv_image = super().get_cv_image(frame)
+            # cv_image = super().get_cv_image(frame)
             cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
 
             if self.camera_description.type == CameraType.ETHERNET:
                 # Switches ethernet's color profile from BayerBGR to BGR
                 cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BAYER_BGGR2BGR)
             # Run model on cv_image
-            model = YOLO(str(
-                Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')
-            ))
+            model = YOLO(str(Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')))
 
             results = model(cv_image)
             results[0].show()

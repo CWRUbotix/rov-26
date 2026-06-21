@@ -1,33 +1,24 @@
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from math import atan, sqrt, tan
 from typing import Generic, TypeGuard, TypeVar, override
 
-from PyQt6.QtCore import QRect, Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QColor, QFont, QImage, QKeyEvent, QMouseEvent, QPainter, QPixmap
+from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QGridLayout,
     QHBoxLayout,
-    QLabel,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from gui.gui_node import GUINode
 from gui.widgets.video_widget import (
     CameraDescription,
-    CameraManager,
     CameraType,
-    ClickableLabel,
     PauseableVideoWidget,
-    VideoWidget,
 )
 from rov_msgs.msg import Intrinsics
-from rov_msgs.srv import CameraManage
 
-#CAM0_TOPIC = 'cam0/image_raw'
+# CAM0_TOPIC = 'cam0/image_raw'
 CAM1_TOPIC = 'cam1/image_raw'
 
 FRAME_WIDTH = 816
@@ -112,8 +103,8 @@ def format_length(length: float) -> str:
 
 
 class CrabDetectorTab(QWidget):
-    #click_left_signal = pyqtSignal(QMouseEvent)
-    #click_right_signal = pyqtSignal(QMouseEvent)
+    # click_left_signal = pyqtSignal(QMouseEvent)
+    # click_right_signal = pyqtSignal(QMouseEvent)
 
     def __init__(self) -> None:
         super().__init__()
@@ -145,8 +136,8 @@ class CrabDetectorTab(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def make_coarse_tab(self) -> QWidget:
-        #self.click_left_signal.connect(self.click_left_slot)
-        #self.click_right_signal.connect(self.click_right_slot)
+        # self.click_left_signal.connect(self.click_left_slot)
+        # self.click_right_signal.connect(self.click_right_slot)
 
         cam_layout = QHBoxLayout()
 
@@ -161,7 +152,7 @@ class CrabDetectorTab(QWidget):
                     FRAME_HEIGHT,
                 ),
                 #'switch_rect_stream',
-                #make_label=lambda: ClickableLabel(self.click_left_signal),
+                # make_label=lambda: ClickableLabel(self.click_left_signal),
             ),
         }
 
