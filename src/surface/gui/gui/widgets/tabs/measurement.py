@@ -78,15 +78,15 @@ class MeasurementTab(QWidget):
         pipeline_layout = QHBoxLayout()
 
         start_btn = QPushButton('start pipeline')
-        start_btn.clicked.connect(self.pub_start)
+        start_btn.clicked.connect(self.pub_start_pipeline)
         end_btn = QPushButton('end pipeline')
-        end_btn.clicked.connect(self.pub_end)
+        end_btn.clicked.connect(self.pub_stop_pipeline)
 
         pipeline_layout.addWidget(start_btn)
         pipeline_layout.addWidget(end_btn)
 
         point_btn = QPushButton('get point cloud')
-        point_btn.clicked.connect(self.pub_point)
+        point_btn.clicked.connect(self.pub_retrieve_pointcloud)
 
         self.distance_label = QLabel('Distance = ')
         self.pipeline_label = QLabel('Pipeline is off')
@@ -132,23 +132,25 @@ class MeasurementTab(QWidget):
             )
         }
 
+        cam_layout.addWidget(self.eye_widgets[Eye.LEFT])
+
         coarse_tab = QWidget()
         coarse_tab.setLayout(cam_layout)
 
         return coarse_tab
 
-    def pub_start(self) -> None:
+    def pub_start_pipeline(self) -> None:
         print('\n\n\n\npublishing')
         self.start_publisher.publish(Bool(data=True))
         self.pipeline_label.setText('Pipeline is started')
 
-    def pub_end(self) -> None:
+    def pub_stop_pipeline(self) -> None:
         print('\n\n\n\npublishing')
 
         self.start_publisher.publish(Bool(data=False))
         self.pipeline_label.setText('Pipeline is stopped')
 
-    def pub_point(self) -> None:
+    def pub_retrieve_pointcloud(self) -> None:
         print('\n\n\n\npublishing')
 
         self.point_publisher.publish(Bool(data=True))
