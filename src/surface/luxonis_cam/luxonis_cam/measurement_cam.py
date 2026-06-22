@@ -14,6 +14,7 @@ from rclpy.qos import QoSPresetProfiles
 from rov_msgs.srv._camera_manage import CameraManage
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32
+import threading
 
 Matlike = NDArray[np.uint8]
 
@@ -31,15 +32,15 @@ class MeasurementCam(Node):
         super().__init__('measurement_cam')
 
         self.create_subscription(
-            Bool, 'retrieve_pointcloud', self.retrieve_pointcloud, QoSPresetProfiles.DEFAULT.value
+            Bool, 'retrieve_pointcloud', self.start_pointcloud, QoSPresetProfiles.DEFAULT.value
         )
 
         self.cam_publisher = self.create_publisher(
-            Image, 'lux_raw/image_raw', QoSPresetProfiles.SENSOR_DATA.value
+            Image, 'lux_raw/image_raw', QoSPresetProfiles.DEFAULT.value
         )
 
         self.measurement_publisher = self.create_publisher(
-            Float32, 'measure_result', QoSPresetProfiles.SENSOR_DATA.value
+            Float32, 'measure_result', QoSPresetProfiles.DEFAULT.value
         )
 
         self.create_subscription(
@@ -133,6 +134,7 @@ class MeasurementCam(Node):
             try:
                 self.pipeline.start()
                 self.pipeline.__enter__()
+                self.get_logger().info('Pipeline started')
             except RuntimeError as e:  # noqa: F841 (unused variable e for optional logging below)
                 self.get_logger().warning(
                     'Error uploading to Luxonis cam, retrying '
@@ -144,10 +146,14 @@ class MeasurementCam(Node):
                 continue
             break
 
-    def retrieve_pointcloud(self, _data: Bool) -> None:
+    def start_pointcloud(self, _data: Bool) -> None:
+        self.point_thread = threading.Thread(target=self.retrieve_pointcloud)
+        self.point_thread.start()
+
+    def retrieve_pointcloud(self) -> None:
         self.get_logger().info('getting points')
         if self.rgbd_queue is not None:
-            vis = o3d.visualization.VisualizerWithEditing()
+            vis : o3d.visualization.VisualizerWithEditing = o3d.visualization.VisualizerWithEditing()
             vis.create_window()
             # vis.register_key_action_callback(81, key_callback)
             pcd = o3d.geometry.PointCloud()
@@ -163,15 +169,19 @@ class MeasurementCam(Node):
                 self.get_logger().info('errored')
                 return # Pipeline closed
             if inPointCloud is not None:
+                self.get_logger().info('point cloud is not none')
                 points, colors = inPointCloud.getPointsRGB()
                 pcd.points = o3d.utility.Vector3dVector(points.astype(np.float64))
                 colors = (colors / 255.0).astype(np.float64)
                 pcd.colors = o3d.utility.Vector3dVector(np.delete(colors, 3, 1))
                 vis.add_geometry(pcd)
                 vis.run()
+                self.get_logger().info('point cloud closed')
+
                 vis.destroy_window()
-                self.get_logger().info(vis.get_picked_points())
+                self.get_logger().info('window destroyed')
                 selected_points = vis.get_picked_points()
+                print(selected_points)
 
                 if len(selected_points) == 2:
                     point_array = np.asarray(pcd.points)
@@ -180,8 +190,9 @@ class MeasurementCam(Node):
                     point2 = point_array[selected_points[1]]
 
                     distance = np.linalg.norm(point1 - point2) / 10
-                    self.get_logger().info(distance)
+                    self.get_logger().info(str(distance))
                     self.measurement_publisher.publish(Float32(data=distance))
+
 
 
             else:
