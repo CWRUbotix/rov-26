@@ -12,7 +12,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float32
 
 Matlike = NDArray[np.uint8]
 
@@ -37,11 +37,15 @@ class MeasurementCam(Node):
             Image, 'lux_raw/image_raw', QoSPresetProfiles.SENSOR_DATA.value
         )
 
+        self.measurement_publisher = self.create_publisher(
+            Float32, 'measure_result', QoSPresetProfiles.SENSOR_DATA.value
+        )
+
         self.create_subscription(
             Bool, 'measurement_pipeline', self.control_pipeline, QoSPresetProfiles.DEFAULT.value
         )
 
-        print('measurement launched')
+        self.get_logger().info('measurement launched')
 
         self.rgbd_queue: dai.MessageQueue|None = None
         self.pipeline: dai.Pipeline|None = None
@@ -111,7 +115,7 @@ class MeasurementCam(Node):
             break
 
     def retrieve_pointcloud(self, _data: Bool) -> None:
-        print('getting points')
+        self.get_logger().info('getting points')
         if self.rgbd_queue is not None:
             vis = o3d.visualization.VisualizerWithEditing()
             vis.create_window()
@@ -119,14 +123,14 @@ class MeasurementCam(Node):
             pcd = o3d.geometry.PointCloud()
 
             try:
-                print('before sleep')
+                self.get_logger().info('before sleep')
                 time.sleep(5)
                 inPointCloud = self.rgbd_queue.tryGet()
-                print('got inputPCL pointcloud')
+                self.get_logger().info('got inputPCL pointcloud')
                 time.sleep(5)
-                print('after 2nd sleep')
+                self.get_logger().info('after 2nd sleep')
             except dai.MessageQueue.QueueException:
-                print('errored')
+                self.get_logger().info('errored')
                 return # Pipeline closed
             if inPointCloud is not None:
                 points, colors = inPointCloud.getPointsRGB()
@@ -136,21 +140,24 @@ class MeasurementCam(Node):
                 vis.add_geometry(pcd)
                 vis.run()
                 vis.destroy_window()
-                print(vis.get_picked_points())
+                self.get_logger().info(vis.get_picked_points())
                 selected_points = vis.get_picked_points()
-                point_array = np.asarray(pcd.points)
 
-                point1 = point_array[selected_points[0]]
-                point2 = point_array[selected_points[1]]
+                if len(selected_points) == 2:
+                    point_array = np.asarray(pcd.points)
 
-                distance = np.linalg.norm(point1 - point2)
-                print(distance)
+                    point1 = point_array[selected_points[0]]
+                    point2 = point_array[selected_points[1]]
+
+                    distance = np.linalg.norm(point1 - point2) / 10
+                    self.get_logger().info(distance)
+                    self.measurement_publisher.publish(Float32(data=distance))
 
 
             else:
-                print('pointcloud none')
+                self.get_logger().info('pointcloud none')
         else:
-            print('RGBD queue is none, please start pipeline before retrieving pointcloud')
+            self.get_logger().info('RGBD queue is none, please start pipeline before retrieving pointcloud')
 
     def spin(self) -> None:
         if self.left_cam_queue is not None:
@@ -193,10 +200,10 @@ class MeasurementCam(Node):
         return img_msg
 
     def control_pipeline(self, data: Bool) -> None:
-        print('\n\n\n\n\n\nRecieved pipeline control')
+        self.get_logger().info('\n\nRecieved pipeline control')
         if data.data:
             if self.pipeline is None:
-                print('creating pipeline')
+                self.get_logger().info('creating pipeline')
                 self.create_pipeline()
             else:
                 self.get_logger().error('Pipeline already created')
@@ -205,7 +212,7 @@ class MeasurementCam(Node):
             self.pipeline = None
             self.left_cam_queue = None
             self.rgbd_queue = None
-            print('killed pipeline')
+            self.get_logger().info('killed pipeline')
         else:
             self.get_logger().warn('Pipeline is already killed')
 

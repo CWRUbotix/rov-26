@@ -21,6 +21,7 @@ import time
 import cv2
 import depthai as dai
 import numpy as np
+from gui.widgets.logger import Logger
 import rclpy
 from builtin_interfaces.msg import Time
 from cv_bridge import CvBridge
@@ -41,6 +42,7 @@ from gui.widgets.video_widget import (
 )
 from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
+from std_msgs.msg import Float32
 
 FRAME_WIDTH = 816
 FRAME_HEIGHT = 510
@@ -52,6 +54,8 @@ class Eye(IntEnum):
     RIGHT = 1
 
 class MeasurementTab(QWidget):
+    handle_measurement_signal = pyqtSignal(Float32)
+
 
     def __init__(self) -> None:
         super().__init__()
@@ -59,19 +63,43 @@ class MeasurementTab(QWidget):
         self.start_publisher = GUINode().create_publisher(Bool, 'measurement_pipeline', QoSPresetProfiles.DEFAULT.value)
         self.point_publisher = GUINode().create_publisher(Bool, 'retrieve_pointcloud', QoSPresetProfiles.DEFAULT.value)
 
+        self.handle_measurement_signal.connect(self.handle_measurement)
+        GUINode().create_signal_subscription(
+            Float32,
+            'measurement_result',
+            self.handle_measurement_signal,
+            qos_profile=QoSPresetProfiles.DEFAULT.value,
+        )
+
+
         root_layout = QVBoxLayout()
         root_layout.addWidget(self.make_coarse_tab())
+
+        pipeline_layout = QHBoxLayout()
 
         start_btn = QPushButton('start pipeline')
         start_btn.clicked.connect(self.pub_start)
         end_btn = QPushButton('end pipeline')
         end_btn.clicked.connect(self.pub_end)
+
+        pipeline_layout.addWidget(start_btn)
+        pipeline_layout.addWidget(end_btn)
+
         point_btn = QPushButton('get point cloud')
         point_btn.clicked.connect(self.pub_point)
 
-        root_layout.addWidget(start_btn)
-        root_layout.addWidget(end_btn)
+        self.distance_label = QLabel('Distance = ')
+        self.pipeline_label = QLabel('Pipeline is off')
+        label_font = self.pipeline_label.font()
+        label_font.setPointSize(30)
+        self.pipeline_label.setFont(label_font)
+        self.distance_label.setFont(label_font)
+
+        root_layout.addLayout(pipeline_layout)
+        root_layout.addWidget(self.pipeline_label)
         root_layout.addWidget(point_btn)
+        root_layout.addWidget(self.distance_label)
+        root_layout.addWidget(Logger())
 
 
         self.setLayout(root_layout)
@@ -108,19 +136,23 @@ class MeasurementTab(QWidget):
         coarse_tab.setLayout(cam_layout)
 
         return coarse_tab
-    
+
     def pub_start(self) -> None:
         print('\n\n\n\npublishing')
         self.start_publisher.publish(Bool(data=True))
+        self.pipeline_label.setText('Pipeline is started')
 
     def pub_end(self) -> None:
         print('\n\n\n\npublishing')
 
         self.start_publisher.publish(Bool(data=False))
+        self.pipeline_label.setText('Pipeline is stopped')
 
     def pub_point(self) -> None:
         print('\n\n\n\npublishing')
 
         self.point_publisher.publish(Bool(data=True))
 
-    
+    @pyqtSlot(Float32)
+    def handle_measurement(self, msg: Float32) -> None:
+        self.distance_label.setText(f'Distance = ${msg.data} cm')
