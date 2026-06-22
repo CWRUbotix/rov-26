@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
+from rov_msgs.srv._camera_manage import CameraManage
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32
 
@@ -45,12 +46,41 @@ class MeasurementCam(Node):
             Bool, 'measurement_pipeline', self.control_pipeline, QoSPresetProfiles.DEFAULT.value
         )
 
+        self.cam_manage_service = self.create_service(
+            CameraManage, 'manage_luxonis', self.cam_manage_callback
+        )
+
         self.get_logger().info('measurement launched')
 
         self.rgbd_queue: dai.MessageQueue|None = None
         self.pipeline: dai.Pipeline|None = None
         self.left_cam_queue: dai.MessageQueue|None = None
         self.bridge = CvBridge()
+
+
+    def cam_manage_callback(
+        self, request: CameraManage.Request, response: CameraManage.Response
+    ) -> CameraManage.Response:
+        """
+        Enable/disable streams based on cam manage service call.
+
+        Parameters
+        ----------
+        request : CameraManage.Request
+            CameraManage service request
+        response : CameraManage.Response
+            CameraManage service response template
+
+        Returns
+        -------
+        CameraManage.Response
+            the service response
+        """
+        response.success = True
+
+        self.get_logger().info(f'Please turn on camera using measurement tab')
+
+        return response
 
     def create_pipeline(self) -> None:
         # Create pipeline
