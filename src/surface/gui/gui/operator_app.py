@@ -9,11 +9,13 @@ from gui.widgets.ip_widget import IPWidget
 from gui.widgets.logger import Logger
 from gui.widgets.tabs.general_debug_tab import GeneralDebugTab
 from gui.widgets.tabs.shipwreck import ShipwreckTab
+from gui.widgets.tabs.crab_detector_tab import CrabDetectorTab
 from gui.widgets.temperature import TemperatureSensor
 from gui.widgets.timer import InteractiveTimer
 from gui.widgets.tabs.measurement import MeasurementTab
 
 SHIPWRECK_TEXT = 'Shipwreck'
+CRAB_DETECTOR_TEXT = 'Crab Detector'
 
 
 class OperatorApp(App):
@@ -23,7 +25,6 @@ class OperatorApp(App):
         super().__init__('operator_gui_node')
 
         self.setWindowTitle('Operator GUI - CWRUbotix ROV 2025')
-
         # Main tab
         main_tab = QWidget()
         main_layout = QHBoxLayout()
@@ -58,6 +59,8 @@ class OperatorApp(App):
         self.tabs.addTab(MeasurementTab(), 'Measurement')
         self.shipwreck_tab = ShipwreckTab()
         self.tabs.addTab(self.shipwreck_tab, SHIPWRECK_TEXT)
+        self.crab_detector_tab = CrabDetectorTab()
+        self.tabs.addTab(self.crab_detector_tab, CRAB_DETECTOR_TEXT)
         self.tabs.currentChanged.connect(self.changed_tabs)
         root_layout.addWidget(self.tabs)
 
@@ -68,6 +71,9 @@ class OperatorApp(App):
         if self.tabs.tabText(index) == SHIPWRECK_TEXT:
             # Allow keyboard events
             self.shipwreck_tab.setFocus(Qt.FocusReason.TabFocusReason)
+        elif self.tabs.tabText(index) == CRAB_DETECTOR_TEXT:
+            # Allow keyboard events
+            self.crab_detector_tab.setFocus(Qt.FocusReason.TabFocusReason)
 
 
 def run_gui_operator() -> None:

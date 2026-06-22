@@ -310,7 +310,11 @@ class LuxonisCamDriverNode(Node):
         ):
             input_name = meta.script_topics.script_input_name
             node.requestOutput(
-                (FRAME_WIDTH, FRAME_HEIGHT), type=depthai.ImgFrame.Type.RGB888p
+                # I think we can just change frame width and frame height
+                # If this doesn't work, we can try size=(width, height),
+                # not sure what size we need to make it
+                (FRAME_WIDTH, FRAME_HEIGHT),
+                type=depthai.ImgFrame.Type.RGB888p,
             ).link(script.inputs[input_name])
             script.inputs[input_name].setBlocking(False)
             script.inputs[input_name].setMaxSize(1)

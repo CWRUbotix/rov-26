@@ -1,10 +1,12 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
+from pathlib import Path
 from typing import NamedTuple
 
 import cv2
 import numpy as np
+from ament_index_python.packages import get_package_share_directory
 from cv_bridge import CvBridge
 from numpy.typing import NDArray
 from PyQt6.QtCore import Qt, pyqtBoundSignal, pyqtSignal, pyqtSlot
@@ -12,6 +14,7 @@ from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from rclpy.qos import qos_profile_default
 from sensor_msgs.msg import Image
+from ultralytics import YOLO
 
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
@@ -28,7 +31,6 @@ MatLike = NDArray[np.generic]
 WIDTH = 721
 HEIGHT = 541
 # 1 Pixel larger than actual pixel dimensions
-
 
 COLOR = 3
 GREY_SCALE = 2
@@ -79,6 +81,8 @@ class CameraDescription(NamedTuple):
         The height of the Camera Stream, by default HEIGHT constant.
     manager: CameraManager | None
         Used for toggling cam streams in SwitchableVideoWidgets
+    is_crop: bool
+        Used for cropping the down cam and not the other cams
 
     """
 
@@ -88,6 +92,7 @@ class CameraDescription(NamedTuple):
     width: int = WIDTH
     height: int = HEIGHT
     manager: CameraManager | None = None
+    is_crop: bool = False
 
 
 class ClickableLabel(QLabel):
@@ -141,12 +146,35 @@ class VideoWidget(QWidget):
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
-
         qt_image: QImage = self.convert_cv_qt(
             cv_image, self.camera_description.width, self.camera_description.height
         )
+        # for cropped down cam
+        if self.camera_description.is_crop:
+            w = self.camera_description.width
+            h = self.camera_description.height
 
-        self.set_pixmap(QPixmap.fromImage(qt_image))
+            zoom = 1.5
+
+            crop_h = int(h / zoom)
+            crop_w = crop_h
+
+            x = (w - crop_w) // 2
+            y = (h - crop_h) // 2 - 60
+
+            cropped = qt_image.copy(x, y, crop_w, crop_h)
+
+            zoomed = cropped.scaled(
+                w,
+                h,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+
+            self.set_pixmap(QPixmap.fromImage(zoomed))
+
+        else:
+            self.set_pixmap(QPixmap.fromImage(qt_image))
 
     def get_pixmap(self) -> QPixmap:
         return self.video_frame_label.pixmap()
@@ -284,13 +312,31 @@ class PauseableVideoWidget(VideoWidget):
             GUINode().get_logger().error('Missing Layout')
 
         self.is_paused = False
+        self.ran_model = False
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         if not self.is_paused:
             super().handle_frame(frame)
+        elif self.is_paused and not self.ran_model:
+            #cv_image = super().get_cv_image(frame)
+            cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+
+            if self.camera_description.type == CameraType.ETHERNET:
+                # Switches ethernet's color profile from BayerBGR to BGR
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BAYER_BGGR2BGR)
+            # Run model on cv_image
+            model = YOLO(str(
+                Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')
+            ))
+
+            results = model(cv_image)
+            results[0].show()
+            self.ran_model = True
 
     def toggle(self) -> None:
         """Toggle whether this widget is paused or playing."""
+        if self.is_paused:
+            self.ran_model = False
         self.is_paused = not self.is_paused
         self.button.setText(self.PAUSED_TEXT if self.is_paused else self.PLAYING_TEXT)
