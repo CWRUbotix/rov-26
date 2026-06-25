@@ -28,7 +28,7 @@ from rov_msgs.msg import Intrinsics
 from rov_msgs.srv import CameraManage
 
 #CAM0_TOPIC = 'cam0/image_raw'
-CAM1_TOPIC = 'cam1/image_raw'
+CAM1_TOPIC = 'cam0/image_raw'
 
 FRAME_WIDTH = 816
 FRAME_HEIGHT = 510
