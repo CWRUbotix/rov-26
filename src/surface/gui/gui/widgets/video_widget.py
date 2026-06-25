@@ -330,7 +330,7 @@ class PauseableVideoWidget(VideoWidget):
                 Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')
             ))
 
-            results = model(cv_image)
+            results = model(cv_image, conf=0.5)
             results[0].show()
             self.ran_model = True
 

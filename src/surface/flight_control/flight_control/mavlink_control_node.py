@@ -431,7 +431,7 @@ class MavlinkManualControlNode(Node):
             self.get_logger().info(f'Back Cam Mode {self.back_cam_mode}')
             if self.back_cam_mode:
                 self.right_stream_switch_publisher.publish(
-                    VideoWidgetSwitch(relative=False, index=1)
+                    VideoWidgetSwitch(relative=False, index=2)
                 )
             else:
                 self.right_stream_switch_publisher.publish(
