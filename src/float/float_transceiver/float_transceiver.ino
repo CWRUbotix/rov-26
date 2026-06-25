@@ -46,7 +46,7 @@ const uint32_t PROFILE_SEGMENT = 10000;
 const uint32_t PRESSURE_READ_INTERVAL = 5000;
 const uint32_t PROFILE_SEGMENT = 60000;
 #endif
-const uint16_t VALID_PACKETS_NEEDED = 10;
+const uint16_t VALID_PACKETS_NEEDED = 7;
 
 const uint32_t PRESSURE_TRANSMIT_INTERVAL = 1000;
 
@@ -58,7 +58,7 @@ const uint32_t RELEASE_MAX = 8 * ONE_MINUTE;
 const uint32_t SUCK_MAX = PROFILE_SEGMENT;
 const uint32_t DESCEND_TIME = 4 * ONE_MINUTE;
 const uint32_t PUMP_MAX = PROFILE_SEGMENT;
-const uint32_t ASCEND_TIME = ONE_MINUTE;
+const uint32_t ASCEND_TIME = 4 * ONE_MINUTE;
 const uint32_t TX_MAX_TIME = 2 * ONE_MINUTE;
 
 // Distance from the pressure sensor to the bottom of the float (m)
@@ -81,7 +81,7 @@ const long NEUTRAL_BOUYANCY_ANGLE = 116;
 RH_RF95 rf95(RFM95_CS, RFM95_INT, softwareSPI);
 MS5837 pressureSensor;
 
-byte packets[2][PKT_LEN];
+byte packets[4][PKT_LEN];
 int packetIndex = PKT_HEADER_LEN;
 
 enum class StageType {
@@ -90,7 +90,6 @@ enum class StageType {
   DeployPump,
   WaitDeploying,
   Descending,
-  Pump,
   Ascending,
   WaitTransmitting
 };
@@ -102,7 +101,7 @@ StageType stage = StageType::DeploySuck;
 OverrideState overrideState = OverrideState::NoOverride;
 MotorState motorState = MotorState::Error;
 
-uint8_t nextProfileNum = 0;
+uint8_t currentProfileNum = 1; // Flips at start so currentProfileNum inits at 0
 uint8_t profileHalf = 0;
 
 uint32_t stageTimeout = 0;
@@ -140,8 +139,9 @@ uint32_t lastKalmanUpdate;
 const float DEPTH_SENSOR_VAR = 5e-5;  // std dev of 3mm
 const float VEL_PROCESS_NOISE = 1e-3;
 
-const float TARGET_DEPTH = 2.0;     // meters
-const float DEPTH_TOLERANCE = 0.5;  // 0.5 m in either direction of target, i.e. 2m to 3m
+const float TARGET_DEPTH = 2.5;     // meters
+const float ASCEND_TARGET_DEPTH = 0.4;     // meters
+const float DEPTH_TOLERANCE = 0.33;  // 0.5 m in either direction of target, i.e. 2m to 3m
 
 const float DEPTH_P = 15;
 const float DEPTH_I = 2;
@@ -196,6 +196,7 @@ void setup() {
 
   // Set up radio and packets
   resetPackets(0);
+  resetPackets(1);
   initRadio();
 
   initPressureSensor();
@@ -270,19 +271,10 @@ void loop() {
       break;
 
     case StageType::Descending:
-      hover();
+      hover(TARGET_DEPTH);
 
       // Check for stage completion
-      if (millis() > stageTimeout || countValidPackets() >= VALID_PACKETS_NEEDED) {
-        motorStop();
-
-        startStagePump();
-      }
-      break;
-
-    case StageType::Pump:
-      // Check for stage completion
-      if (millis() > stageTimeout || isEmpty()) {
+      if (millis() > stageTimeout || countValidPackets(TARGET_DEPTH) >= VALID_PACKETS_NEEDED) {
         motorStop();
 
         startStageAscending();
@@ -290,9 +282,15 @@ void loop() {
       break;
 
     case StageType::Ascending:
+      hover(ASCEND_TARGET_DEPTH);
       // Check for stage completion
-      if (millis() > stageTimeout || getDepth() < PRESSURE_SENSOR_VERTICAL_OFFSET + 0.01) {
-        startStageWaitWaitTransmitting();
+      if (millis() > stageTimeout || countValidPackets(ASCEND_TARGET_DEPTH) >= VALID_PACKETS_NEEDED) {
+        motorStop();
+        
+        if (currentProfileNum == 1) // End of 2nd profile
+          startStageWaitWaitTransmitting();
+        else
+          startStageDescending();
       }
       break;
 
@@ -356,8 +354,8 @@ void startStageDescending() {
 
   setLedColor(COLOR_DESCENDING);
 
-  resetPackets(nextProfileNum);
-  nextProfileNum = !nextProfileNum;
+  currentProfileNum = !currentProfileNum;
+  resetPackets(currentProfileNum);
 
   taskRecordPressure.enable();
 
@@ -373,22 +371,25 @@ void startStageDescending() {
   depthErrAcc = 0;
 }
 
-void startStagePump() {
-  Serial.println("Stage: Pump");
-  stage = StageType::Pump;
-  stageTimeout = millis() + PUMP_MAX;
-
-  setLedColor(COLOR_ASCENDING);
-  motorPump();
-}
-
 void startStageAscending() {
   Serial.println("Stage: Ascending");
   stage = StageType::Ascending;
   stageTimeout = millis() + ASCEND_TIME;
+  Serial.print("Descend time: ");
+  Serial.println(stageTimeout);
 
   setLedColor(COLOR_ASCENDING);
-  motorStop();
+
+  // Init Kalman filter
+  depthMean = 0;
+  velMean = 0;
+  depthVar = 1;
+  velVar = 1;
+  depthVelCovar = 0;
+  lastKalmanUpdate = millis();
+
+  // Init control system
+  depthErrAcc = 0;
 }
 
 void startStageWaitWaitTransmitting() {
@@ -433,28 +434,30 @@ float getDepth() {
 }
 
 void transmitPacketsCallback() {
-  for (int half = 0; half < 2; half++) {
-    serialPrintf(
-      "Sending packet #%d half %d with content {", packets[half][PKT_IDX_PROFILE_NUM], half);
-    for (int p = 0; p < PKT_LEN; p++) {
-      serialPrintf("%d, ", packets[half][p]);
-    }
-    Serial.println("}");
+  for (int profile = 0; profile < 2; profile++) {
+    for (int half = 0; half < 2; half++) {
+      serialPrintf(
+        "Sending packet #%d half %d with content {", packets[half + profile*2][PKT_IDX_PROFILE_NUM], half);
+      for (int p = 0; p < PKT_LEN; p++) {
+        serialPrintf("%d, ", packets[half + profile*2][p]);
+      }
+      Serial.println("}");
 
-    rf95.send(packets[half], PKT_LEN);
-    rf95.waitPacketSent();
+      rf95.send(packets[half + profile*2], PKT_LEN);
+      rf95.waitPacketSent();
+    }
   }
 }
 
 void recordPressureCallback() {
   uint32_t currentTime = millis();
-  memcpy(packets[profileHalf] + packetIndex, &currentTime, sizeof(uint32_t));
+  memcpy(packets[profileHalf + currentProfileNum * 2] + packetIndex, &currentTime, sizeof(uint32_t));
   packetIndex += sizeof(uint32_t);
 
   float depth = getDepth();
   serialPrintf("Calculated depth: %f\n", depth);
 
-  memcpy(packets[profileHalf] + packetIndex, &depth, sizeof(float));
+  memcpy(packets[profileHalf + currentProfileNum * 2] + packetIndex, &depth, sizeof(float));
   packetIndex += sizeof(float);
 
   if (profileHalf == 0 && packetIndex >= PKT_LEN) {
@@ -571,7 +574,7 @@ void updateKalmanFilter(float deltaTime, float measuredDepth, float measurementV
 float deltaTime;
 float depthErr;
 
-void hover() {
+void hover(float target) {
   uint32_t updateTime = millis();
   deltaTime = (updateTime - lastKalmanUpdate) * 0.001;
   lastKalmanUpdate = updateTime;
@@ -585,7 +588,7 @@ void hover() {
   // Serial.print(" Vel: ");
   // Serial.println(velMean, 3);
 
-  depthErr = TARGET_DEPTH - depthMean;
+  depthErr = target - depthMean;
 
   // From -1 to 1, positive is suck (increase depth)
   float motorSetpoint = controlVelocityBased();
@@ -754,10 +757,11 @@ float getMotorAngle() { return -encoder.position * TWO_PI / COUNTS_PER_REV; }
 
 bool isEmpty() { return getMotorAngle() > EMPTY_ANGLE; }
 
-int countValidPackets() {
+int countValidPackets(float targetDepth) {
   float depths[2 * (int)((PKT_LEN - PKT_HEADER_LEN) / (sizeof(float) + sizeof(uint32_t)))];
   int totalPackets = 0;
-  for (int half = 0; half < 2; half++) {
+  // Copy data into depths for easier reading
+  for (int half = currentProfileNum * 2; half < 2 + currentProfileNum * 2; half++) {
     for (int p = PKT_HEADER_LEN + sizeof(uint32_t); p < PKT_LEN;
          p += sizeof(float) + sizeof(uint32_t)) {
       memcpy(&depths[totalPackets], packets[half] + p, sizeof(float));
@@ -766,15 +770,15 @@ int countValidPackets() {
   }
   int validPackets = 0;
   for (int i = 0; i < totalPackets; i++) {
-    if (TARGET_DEPTH - DEPTH_TOLERANCE < depths[i] && depths[i] < TARGET_DEPTH + DEPTH_TOLERANCE) {
+    if (targetDepth - DEPTH_TOLERANCE < depths[i] && depths[i] < targetDepth + DEPTH_TOLERANCE) {
       validPackets++;
     }
   }
   return validPackets;
 }
 
-void clearPacketPayloads() {
-  for (int half = 0; half < 2; half++) {
+void clearPacketPayloads(uint8_t profileNum) {
+  for (int half = profileNum * 2; half < 2 + profileNum * 2; half++) {
     for (int i = PKT_HEADER_LEN; i < PKT_LEN; i++) {
       packets[half][i] = 0;
     }
@@ -782,14 +786,14 @@ void clearPacketPayloads() {
 }
 
 void resetPackets(uint8_t profileNum) {
-  clearPacketPayloads();
+  clearPacketPayloads(profileNum);
 
-  packets[0][PKT_IDX_TEAM_NUM] = TEAM_NUM;
-  packets[0][PKT_IDX_PROFILE_HALF] = 0;
-  packets[0][PKT_IDX_PROFILE_NUM] = profileNum;
-  packets[1][PKT_IDX_TEAM_NUM] = TEAM_NUM;
-  packets[1][PKT_IDX_PROFILE_HALF] = 1;
-  packets[1][PKT_IDX_PROFILE_NUM] = profileNum;
+  packets[2*profileNum][PKT_IDX_TEAM_NUM] = TEAM_NUM;
+  packets[2*profileNum][PKT_IDX_PROFILE_HALF] = 0;
+  packets[2*profileNum][PKT_IDX_PROFILE_NUM] = profileNum;
+  packets[1+2*profileNum][PKT_IDX_TEAM_NUM] = TEAM_NUM;
+  packets[1+2*profileNum][PKT_IDX_PROFILE_HALF] = 1;
+  packets[1+2*profileNum][PKT_IDX_PROFILE_NUM] = profileNum;
 
   packetIndex = PKT_HEADER_LEN;
   profileHalf = 0;
