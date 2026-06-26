@@ -81,7 +81,7 @@ const long NEUTRAL_BOUYANCY_ANGLE = 116;
 RH_RF95 rf95(RFM95_CS, RFM95_INT, softwareSPI);
 MS5837 pressureSensor;
 
-byte packets[4][PKT_LEN];
+byte packets[6][PKT_LEN];
 int packetIndex = PKT_HEADER_LEN;
 
 enum class StageType {
@@ -101,7 +101,7 @@ StageType stage = StageType::DeploySuck;
 OverrideState overrideState = OverrideState::NoOverride;
 MotorState motorState = MotorState::Error;
 
-uint8_t currentProfileNum = 1; // Flips at start so currentProfileNum inits at 0
+uint8_t currentProfileNum = 2; // Flips at start so currentProfileNum inits at 0
 uint8_t profileHalf = 0;
 
 uint32_t stageTimeout = 0;
@@ -197,6 +197,7 @@ void setup() {
   // Set up radio and packets
   resetPackets(0);
   resetPackets(1);
+  resetPackets(2);
   initRadio();
 
   initPressureSensor();
@@ -271,10 +272,11 @@ void loop() {
       break;
 
     case StageType::Descending:
-      hover(TARGET_DEPTH);
+      // hover(TARGET_DEPTH);
+      motorSuck();
 
       // Check for stage completion
-      if (millis() > stageTimeout || countValidPackets(TARGET_DEPTH) >= VALID_PACKETS_NEEDED) {
+      if (millis() > stageTimeout || !digitalRead(PIN_LIMIT_NO)) {
         motorStop();
 
         startStageAscending();
@@ -282,12 +284,14 @@ void loop() {
       break;
 
     case StageType::Ascending:
-      hover(ASCEND_TARGET_DEPTH);
+      // hover(ASCEND_TARGET_DEPTH);
+      motorPump();
+      
       // Check for stage completion
-      if (millis() > stageTimeout || countValidPackets(ASCEND_TARGET_DEPTH) >= VALID_PACKETS_NEEDED) {
+      if (millis() > stageTimeout || isEmpty()) {
         motorStop();
         
-        if (currentProfileNum == 1) // End of 2nd profile
+        if (currentProfileNum == 2) // End of 3nd profile
           startStageWaitWaitTransmitting();
         else
           startStageDescending();
@@ -354,7 +358,7 @@ void startStageDescending() {
 
   setLedColor(COLOR_DESCENDING);
 
-  currentProfileNum = !currentProfileNum;
+  currentProfileNum = (currentProfileNum + 1) % 3;
   resetPackets(currentProfileNum);
 
   taskRecordPressure.enable();
@@ -434,7 +438,7 @@ float getDepth() {
 }
 
 void transmitPacketsCallback() {
-  for (int profile = 0; profile < 2; profile++) {
+  for (int profile = 0; profile < 3; profile++) {
     for (int half = 0; half < 2; half++) {
       serialPrintf(
         "Sending packet #%d half %d with content {", packets[half + profile*2][PKT_IDX_PROFILE_NUM], half);
@@ -854,7 +858,6 @@ void initRadio() {
 void initPressureSensor() {
   setLedColor({0, 255, 255});
   bool init_success = false;
-
   Wire.begin();
 
   for (int i = 0; i < 5; i++) {
@@ -865,10 +868,10 @@ void initPressureSensor() {
     delay(200);
   }
 
-  if (!init_success) {
-    errorAndStop("Pressure sensor init failed", PRESSURE_SENSOR_INIT);
-  }
+  // if (!init_success) {
+  //   Serial.println("Pressure sensor init failed");
+  // }
 
-  pressureSensor.setModel(MS5837::MS5837_30BA);
+  pressureSensor.setModel(MS5837::MS5837_02BA);
   pressureSensor.setFluidDensity(997);
 }
