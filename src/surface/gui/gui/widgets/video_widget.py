@@ -1,6 +1,7 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum
+from pathlib import Path
 from typing import NamedTuple
 
 import cv2
@@ -12,6 +13,7 @@ from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 from rclpy.qos import qos_profile_default
 from sensor_msgs.msg import Image
+from ultralytics import YOLO
 
 from gui.gui_node import GUINode
 from rov_msgs.msg import VideoWidgetSwitch
@@ -309,13 +311,29 @@ class PauseableVideoWidget(VideoWidget):
             GUINode().get_logger().error('Missing Layout')
 
         self.is_paused = False
+        self.ran_model = False
 
     @pyqtSlot(Image)
     def handle_frame(self, frame: Image) -> None:
         if not self.is_paused:
             super().handle_frame(frame)
+        elif self.is_paused and not self.ran_model:
+            # cv_image = super().get_cv_image(frame)
+            cv_image = self.cv_bridge.imgmsg_to_cv2(frame, desired_encoding='passthrough')
+
+            if self.camera_description.type == CameraType.ETHERNET:
+                # Switches ethernet's color profile from BayerBGR to BGR
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BAYER_BGGR2BGR)
+            # Run model on cv_image
+            model = YOLO(str(Path('/home/rov/rov-26/src/surface/gui/gui/best.pt')))
+
+            results = model(cv_image)
+            results[0].show()
+            self.ran_model = True
 
     def toggle(self) -> None:
         """Toggle whether this widget is paused or playing."""
+        if self.is_paused:
+            self.ran_model = False
         self.is_paused = not self.is_paused
         self.button.setText(self.PAUSED_TEXT if self.is_paused else self.PLAYING_TEXT)
